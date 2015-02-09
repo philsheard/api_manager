@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name="app_manager",
-    version="0.1",
+    name="apimanager",
+    version="0.1.0",
     description="Common methods to handle web APIs"
     )

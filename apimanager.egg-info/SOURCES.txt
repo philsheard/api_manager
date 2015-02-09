@@ -1,0 +1,5 @@
+setup.py
+apimanager.egg-info/PKG-INFO
+apimanager.egg-info/SOURCES.txt
+apimanager.egg-info/dependency_links.txt
+apimanager.egg-info/top_level.txt
