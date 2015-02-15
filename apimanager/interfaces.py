@@ -1,4 +1,11 @@
-from . import core
+# -*- coding: utf-8 -*-
 
-def test():
-    core.api_request()
+"""
+apimanager.interfaces
+~~~~~~~~~~~~~~~~~
+
+A set of interfaces that enable API access to common systems.
+"""
+
+
+import facebook
