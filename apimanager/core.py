@@ -37,26 +37,25 @@ class RequestManager(object):
 
 		self.access_token = access_token
 
-	def start(self):
+	def run(self):
 		for single_id in self.id_list:
 			string_url = str(self.url_base)
-			# datetime_check = datetime.now()
-			# print datetime_check
 			prepared_url = string_url.format(page_id=single_id, access_token=self.access_token)
 			response = requests.get(prepared_url)
 			first_response_as_dict = json.loads(response.content)
 			created_datetime = pd.to_datetime(first_response_as_dict["data"][-1:][0]["created_time"])
 			responses = list(first_response_as_dict["data"])
 			while created_datetime > pd.to_datetime(self.date_end):
-				print created_datetime
-				print pd.to_datetime(self.date_end)
 				next_url = json.loads(response.content)["paging"]["next"]
 				response = requests.get(next_url)
 				response_loop_as_dict = json.loads(response.content)
-				responses.append(response_loop_as_dict["data"])
-				print response_loop_as_dict
-				created_datetime = pd.to_datetime(response_loop_as_dict["data"][-1:][0]["created_time"])
-
+				if response_loop_as_dict.get("data",None):
+					# Check whether the response has "data" records
+					responses = responses + response_loop_as_dict["data"]
+					created_datetime = pd.to_datetime(response_loop_as_dict["data"][-1:][0]["created_time"])
+				else:
+					# Provide a condition for the loop to end gracefully
+					created_datetime = pd.to_datetime(self.date_end)
 		return responses
 
 	# def stream(self):
