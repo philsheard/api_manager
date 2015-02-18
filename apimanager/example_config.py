@@ -12,7 +12,7 @@ single set of credentials per platform is allowed.
 
 
 credentials = {"facebook":
-                   {"access_token":"CAACEdEose0cBAEgubNav07H4GCDzdrFqc9gtNgoLokWWMFih8qI5ZC4McfG4yjgzZBkcxjcL6xGeeKsSdIw2sMzMZAnnZB7z5fo2nHTqO1m0HybI35nLJK7IjX0VFQSsBRZCbzqqjGeGu5jZCxu86qrgTGHUCP1NW0BgXOpZCCWkwYzCit9i7EioynO4xqnojdRDWjpZAM2RKnOFJ1JIcb6s",},
+                   {"access_token":"ENTER ACCESS TOKEN HERE",},
                 "instagram":
-                    {"client_id":"54d8b3cd1e71423ea1601c3e4306b0bf"}
+                    {"client_id":"ENTER ACCESS TOKEN HERE"}
 }

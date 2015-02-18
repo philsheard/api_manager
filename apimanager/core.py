@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
-#import pandas as pd
+import pandas as pd
 import requests
+import json
+import datetime
 
 """
 apimanager.core
@@ -14,7 +16,7 @@ class RequestManager(object):
 
 	def __init__(self, ids, url_base, access_token, date_start=None, date_end=None):
 		
-
+		# Check whether ids contains a string or list. If it's a string, create a list of one for consistency
 		if isinstance(ids,str):
 			self.id_list = [ids,]
 			self.batch = False
@@ -38,9 +40,24 @@ class RequestManager(object):
 	def start(self):
 		for single_id in self.id_list:
 			string_url = str(self.url_base)
+			# datetime_check = datetime.now()
+			# print datetime_check
 			prepared_url = string_url.format(page_id=single_id, access_token=self.access_token)
 			response = requests.get(prepared_url)
-		return response#.text#["data"]#[-1]
+			first_response_as_dict = json.loads(response.content)
+			created_datetime = pd.to_datetime(first_response_as_dict["data"][-1:][0]["created_time"])
+			responses = list(first_response_as_dict["data"])
+			while created_datetime > pd.to_datetime(self.date_end):
+				print created_datetime
+				print pd.to_datetime(self.date_end)
+				next_url = json.loads(response.content)["paging"]["next"]
+				response = requests.get(next_url)
+				response_loop_as_dict = json.loads(response.content)
+				responses.append(response_loop_as_dict["data"])
+				print response_loop_as_dict
+				created_datetime = pd.to_datetime(response_loop_as_dict["data"][-1:][0]["created_time"])
+
+		return responses
 
 	# def stream(self):
 	# 	pass
