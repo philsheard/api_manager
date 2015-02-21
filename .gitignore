@@ -1,2 +1,2 @@
 *.pyc
-config.py
+apimanager/settings/config.json
