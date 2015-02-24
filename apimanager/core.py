@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import json
 import datetime
+import logging
 
 import numpy as np
 
@@ -49,25 +50,41 @@ class RequestManager(object):
         self.access_token = access_token
 
     def run(self):
+        master_response_list = list()
         for single_id in self.id_list:
             string_url = str(self.url_base)
             prepared_url = string_url.format(page_id=single_id, access_token=self.access_token)
-            response = requests.get(prepared_url)
-            first_response_as_dict = json.loads(response.content)
-            created_datetime = pd.to_datetime(first_response_as_dict["data"][-1:][0]["created_time"])
-            responses = list(first_response_as_dict["data"])
+            created_datetime = datetime.datetime.now()
+
             while created_datetime > pd.to_datetime(self.date_end):
-                next_url = json.loads(response.content)["paging"]["next"]
-                response = requests.get(next_url)
-                response_loop_as_dict = json.loads(response.content)
-                if response_loop_as_dict.get("data",None):
+                response = requests.get(prepared_url)
+
+                # This is where error checking / code checking should take place
+
+                response_dict = json.loads(response.content)
+                if response.status_code != 200:
+                    logging.warning('Response was not a 200 code. Investigate.') # will print a message to the console
+                    print response.status_code
+                    print response.content
+                    raise Exception("Response exception.")
+                elif response_dict.get("data",None):
                     # Check whether the response has "data" records
-                    responses = responses + response_loop_as_dict["data"]
-                    created_datetime = pd.to_datetime(response_loop_as_dict["data"][-1:][0]["created_time"])
+                    master_response_list = master_response_list + response_dict["data"]
+                    created_datetime = pd.to_datetime(response_dict["data"][-1:][0]["created_time"])
+                    prepared_url = json.loads(response.content)["paging"]["next"]
+                    logging.info("Successful response: {id} - {created_datetime} oldest".format(
+                        id=single_id, created_datetime=created_datetime))
+                elif response_dict.get("error",None):
+                    print response_dict
+                    raise Exception("Unknown API error. See response to debug")
                 else:
                     # Provide a condition for the loop to end gracefully
                     created_datetime = pd.to_datetime(self.date_end)
-        return responses
+                    print response_dict
+                    logging.warning('Some sort of error took place. Investigate.') # will print a message to the console
+            else:
+                logging.info("Loop finished for {id}".format(id=single_id))
+        return master_response_list
 
     def batch_run(self, return_format="raw"):
 
