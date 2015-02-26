@@ -50,41 +50,44 @@ class RequestManager(object):
         self.access_token = access_token
 
     def run(self):
-        master_response_list = list()
-        for single_id in self.id_list:
-            string_url = str(self.url_base)
-            prepared_url = string_url.format(page_id=single_id, access_token=self.access_token)
-            created_datetime = datetime.datetime.now()
+        _master_response_list = list()
+        for _single_id in self.id_list:
+            _string_url = str(self.url_base)
+            _prepared_url = _string_url.format(page_id=_single_id, access_token=self.access_token)
+            _created_datetime = datetime.datetime.now()
 
-            while created_datetime > pd.to_datetime(self.date_end):
-                response = requests.get(prepared_url)
+            while _created_datetime > pd.to_datetime(self.date_end):
+                response = requests.get(_prepared_url)
 
                 # This is where error checking / code checking should take place
 
                 response_dict = json.loads(response.content)
                 if response.status_code != 200:
-                    logging.warning('Response was not a 200 code. Investigate.') # will print a message to the console
-                    print response.status_code
-                    print response.content
-                    raise Exception("Response exception.")
+                    # Check whether the response was a valid (200) response first.
+                    # If not, raise an exception
+
+                    # @TODO - this should really have a loop to handle errors like:
+                    # - oauth exceptions, mainly
+
+                    raise Exception('Response was not a 200 code. Investigate.')
+                elif response_dict.get("error",None):
+                    # There was an error in the API from FB. This should be caught by the
+                    # status code check for 200, but it's a backstop just in case.
                 elif response_dict.get("data",None):
                     # Check whether the response has "data" records
-                    master_response_list = master_response_list + response_dict["data"]
-                    created_datetime = pd.to_datetime(response_dict["data"][-1:][0]["created_time"])
-                    prepared_url = json.loads(response.content)["paging"]["next"]
+                    _master_response_list = _master_response_list + response_dict["data"]
+                    _created_datetime = pd.to_datetime(response_dict["data"][-1:][0]["created_time"])
+                    _prepared_url = json.loads(response.content)["paging"]["next"]
                     logging.info("Successful response: {id} - {created_datetime} oldest".format(
-                        id=single_id, created_datetime=created_datetime))
-                elif response_dict.get("error",None):
-                    print response_dict
+                        id=_single_id, created_datetime=_created_datetime))
                     raise Exception("Unknown API error. See response to debug")
                 else:
                     # Provide a condition for the loop to end gracefully
-                    created_datetime = pd.to_datetime(self.date_end)
-                    print response_dict
+                    _created_datetime = pd.to_datetime(self.date_end)
                     logging.warning('Some sort of error took place. Investigate.') # will print a message to the console
             else:
-                logging.info("Loop finished for {id}".format(id=single_id))
-        return master_response_list
+                logging.info("Loop finished for {id}".format(id=_single_id))
+        return _master_response_list
 
     def batch_run(self, return_format="raw"):
 
@@ -100,25 +103,26 @@ class RequestManager(object):
             try:
                 last_response = json.loads(response.content.encode("utf-8"))[-1]#["body"]
                 if last_response["code"] == 200:
-                    print "."
+                    logging.debug("Loop passed")
                     OK_to_proceed = True
                 elif last_response["code"] == 400:
                     if json.loads(last_response["body"])["error"]["code"] == 613:
                         delay_time = 120
-                        print "\nAPI limit exceeded. Waiting for %s seconds" % (delay_time)
-                        print "==="
+                        logging.info("API limit exceeded. Waiting for %s seconds" % (
+                            delay_time))
                         time.sleep(delay_time)
                     else:
-                        print "\nUNKNOWN!!"
-                        print last_response#[:250]
+                        logging.warn("Unknown error - last response:\n{last_response}".format(
+                            last_response=last_response))
                         raise Exception("Unknown error code.")
                 else:
-                    print "\nUNKNOWN!!"
-                    print last_response#[:250]
+                    logging.warn("Unknown error - last response:\n{last_response}".format(
+                        last_response=last_response))
                     raise Exception("Unknown error code.")
             except:
-                print "Unexpected error:", sys.exc_info()[0]
-                raise
+                logging.warn("Unknown error - sys error:\n{sys_error}".format(
+                    sys_error=sys.exc_info()[0]))
+                raise Exception("Unknown error code.")
             # list_of_responses.append(response)
         response_tidy = json.loads(response.content.encode("utf-8"))
         if return_format == "pandas":
