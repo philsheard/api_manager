@@ -5,12 +5,13 @@ import requests
 import json
 import datetime
 import logging
+import time
 
 import numpy as np
 
 import sys
 
-from .utils import split_series_into_batches, batch_id_requests, extract_data_from_single_batch_response
+from .utils import split_series_into_batches, batch_id_requests, extract_data_from_single_batch_response, error_checker
 
 """
 apimanager.core
@@ -49,42 +50,34 @@ class RequestManager(object):
 
         self.access_token = access_token
 
+
     def run(self):
         _master_response_list = list()
         for _single_id in self.id_list:
             _string_url = str(self.url_base)
             _prepared_url = _string_url.format(page_id=_single_id, access_token=self.access_token)
-            _created_datetime = datetime.datetime.now()
-
+            _created_datetime = datetime.datetime.now() # Start from now
             while _created_datetime > pd.to_datetime(self.date_end):
                 response = requests.get(_prepared_url)
-
-                # This is where error checking / code checking should take place
-
-                response_dict = json.loads(response.content)
-                if response.status_code != 200:
-                    # Check whether the response was a valid (200) response first.
-                    # If not, raise an exception
-
-                    # @TODO - this should really have a loop to handle errors like:
-                    # - oauth exceptions, mainly
-
-                    raise Exception('Response was not a 200 code. Investigate.')
-                elif response_dict.get("error",None):
-                    # There was an error in the API from FB. This should be caught by the
-                    # status code check for 200, but it's a backstop just in case.
-                elif response_dict.get("data",None):
-                    # Check whether the response has "data" records
-                    _master_response_list = _master_response_list + response_dict["data"]
-                    _created_datetime = pd.to_datetime(response_dict["data"][-1:][0]["created_time"])
+                logging.debug("Response successful")
+                _response_check = error_checker(response)
+                if _response_check == "VALID":
+                    _response_dict = json.loads(response.content)
+                    _master_response_list = _master_response_list + _response_dict["data"]
+                    _created_datetime = pd.to_datetime(_response_dict["data"][-1:][0]["created_time"])
                     _prepared_url = json.loads(response.content)["paging"]["next"]
                     logging.info("Successful response: {id} - {created_datetime} oldest".format(
                         id=_single_id, created_datetime=_created_datetime))
-                    raise Exception("Unknown API error. See response to debug")
-                else:
-                    # Provide a condition for the loop to end gracefully
+                elif _response_check == "VALID_EMPTY":
                     _created_datetime = pd.to_datetime(self.date_end)
-                    logging.warning('Some sort of error took place. Investigate.') # will print a message to the console
+                elif _response_check == "RATELIMIT":
+                    _wait_seconds = 120
+                    logging.info("Rate limit reached. Waiting for {seconds} seconds".format(seconds=_wait_seconds))
+                    time.wait(_wait_seconds)
+                elif _response_check == "ERROR":
+                    raise Exception("Unknown error check response.")
+                else:
+                    raise Exception("Unknown error check response.")
             else:
                 logging.info("Loop finished for {id}".format(id=_single_id))
         return _master_response_list

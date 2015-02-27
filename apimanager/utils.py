@@ -1,6 +1,7 @@
 import datetime
 import numpy as np
 import json
+import logging
 
 def split_series_into_batches(series):
     array_segment = np.array(series)
@@ -40,3 +41,30 @@ def extract_data_from_single_batch_response(response,as_type='dict'):
         return pd.Series(results)
     else:
         return results
+
+def error_checker(response):
+    # This is just the single-stream version. Need to merge into the batch version,
+    # which is slightly more advanced (it handled OAuth errors better and will
+    # hang back when needed).
+
+    _return_value = "ERROR" # Default option 
+    _response_dict = json.loads(response.content)
+    if response.status_code == 200 && _response_dict.get("data",None):
+        logging.debug("Response looks fine. Setting positive progress.")
+        _return_value = "VALID"
+    elif response.status_code == 200 && not _response_dict.get("data",None):
+        logging.debug("Valid response but no data. Typically end of records.")
+        _return_value = "VALID_EMPTY"
+    elif response.status_code == 400 && _response_dict["body"])["error"]["code"] == 613:
+        # Rate limit error - recommend waiting
+        _return_value = "RATELIMIT"
+    elif _response_dict.get("error",None):
+        # There was an error in the API from FB. This should be caught by the
+        # status code check for 200, but it's a backstop just in case.
+        raise Exception('There was an error. Could be innocent, like a rate limit error.')
+    else:
+        # Provide a condition for the loop to end gracefully
+        _created_datetime = pd.to_datetime(self.date_end)
+        logging.warning('Some sort of unknown error took place. Investigate.') # will print a message to the console
+
+    return _return_value
