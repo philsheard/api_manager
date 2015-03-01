@@ -9,10 +9,10 @@ def split_series_into_batches(series):
     batched_arrays = np.array_split(array_segment, number_of_segments)
     return batched_arrays
 
-def batch_id_requests(data):
+def batch_id_requests(data, url_base):
     list_of_batch_requests = list()
     for i in data:
-        list_of_batch_requests.append({"method":"GET","relative_url":i + "/?fields=shares,likes.summary(true),comments.summary(true)"})
+        list_of_batch_requests.append({"method":"GET","relative_url":i + url_base})
     return list_of_batch_requests
 
 def extract_data_from_single_batch_response(response,as_type='dict'):
@@ -49,13 +49,13 @@ def error_checker(response):
 
     _return_value = "ERROR" # Default option 
     _response_dict = json.loads(response.content)
-    if response.status_code == 200 && _response_dict.get("data",None):
+    if response.status_code == 200 and _response_dict.get("data",None) is True:
         logging.debug("Response looks fine. Setting positive progress.")
         _return_value = "VALID"
-    elif response.status_code == 200 && not _response_dict.get("data",None):
+    elif response.status_code == 200 and _response_dict.get("data",None) is True:
         logging.debug("Valid response but no data. Typically end of records.")
         _return_value = "VALID_EMPTY"
-    elif response.status_code == 400 && _response_dict["body"])["error"]["code"] == 613:
+    elif response.status_code == 400 and _response_dict["body"]["error"]["code"] == 613:
         # Rate limit error - recommend waiting
         _return_value = "RATELIMIT"
     elif _response_dict.get("error",None):

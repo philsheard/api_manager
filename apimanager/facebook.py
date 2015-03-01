@@ -18,6 +18,15 @@ def feed(ids, access_token, date_start=None, date_end=None,):
 
 	return manager
 
+def feed_test(ids, access_token, date_start=None, date_end=None,):
+
+	url_base = "/feed"
+
+	manager = RequestManager(ids=ids, url_base=url_base, access_token=access_token, 
+		date_start=date_start, date_end=date_end)
+
+	return manager
+
 def promotable_posts(ids, access_token, date_start=None, date_end=None,):
 
 	url_base = "https://graph.facebook.com/v2.2/{page_id}/promotable_posts?access_token={access_token}"

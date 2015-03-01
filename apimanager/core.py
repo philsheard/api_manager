@@ -50,6 +50,19 @@ class RequestManager(object):
 
         self.access_token = access_token
 
+    def run_test(self):
+        # for _single_id in self.id_list:
+        #     print _single_id
+        #     print self.url_base.format(page_id=_single_id,
+        #         access_token=self.access_token)
+        args = {'access_token':self.access_token,
+            'batch':json.dumps(batch_id_requests(self.id_list, self.url_base)),
+            'include_headers':'false',}
+        request_baseurl = "https://graph.facebook.com/"
+        response = requests.post(request_baseurl, params=args)
+
+        return response
+
 
     def run(self):
         _master_response_list = list()
