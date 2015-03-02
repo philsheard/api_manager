@@ -20,7 +20,8 @@ def feed(ids, access_token, date_start=None, date_end=None,):
 
 def feed_test(ids, access_token, date_start=None, date_end=None,):
 
-	url_base = "/feed"
+	# url_base = "/feed"
+	url_base = "/?fields=shares,likes.summary(true),comments.summary(true)"
 
 	manager = RequestManager(ids=ids, url_base=url_base, access_token=access_token, 
 		date_start=date_start, date_end=date_end)

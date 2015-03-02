@@ -2,6 +2,7 @@ import datetime
 import numpy as np
 import json
 import logging
+import pandas as pd
 
 def split_series_into_batches(series):
     array_segment = np.array(series)
@@ -52,7 +53,7 @@ def error_checker(response):
     if response.status_code == 200 and _response_dict.get("data",None) is True:
         logging.debug("Response looks fine. Setting positive progress.")
         _return_value = "VALID"
-    elif response.status_code == 200 and _response_dict.get("data",None) is True:
+    elif response.status_code == 200 and _response_dict.get("data",None) is False:
         logging.debug("Valid response but no data. Typically end of records.")
         _return_value = "VALID_EMPTY"
     elif response.status_code == 400 and _response_dict["body"]["error"]["code"] == 613:
@@ -64,7 +65,9 @@ def error_checker(response):
         raise Exception('There was an error. Could be innocent, like a rate limit error.')
     else:
         # Provide a condition for the loop to end gracefully
-        _created_datetime = pd.to_datetime(self.date_end)
-        logging.warning('Some sort of unknown error took place. Investigate.') # will print a message to the console
+#        _created_datetime = pd.to_datetime(self.date_end)
+        print response.content
+        raise Exception('Unknown error - might need to assess whether it has run out of data.')
+#        logging.warning('Some sort of unknown error took place. Investigate.') # will print a message to the console
 
     return _return_value
