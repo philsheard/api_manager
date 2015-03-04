@@ -6,6 +6,7 @@ import json
 import datetime
 import logging
 import time
+import re
 
 import numpy as np
 
@@ -55,12 +56,39 @@ class RequestManager(object):
         #     print _single_id
         #     print self.url_base.format(page_id=_single_id,
         #         access_token=self.access_token)
+
+        # NEEDS TO BE REFACTORED TO ONLY USE THE BATCH METHOD,
+        # SO THAT THERE IS CONSISTENCY. 
+        # If required later, a separate method using the 
+        # standard request format could work.
+
+        # INITIAL SETUP
         args = {'access_token':self.access_token,
             'batch':json.dumps(batch_id_requests(self.id_list, self.url_base)),
             'include_headers':'false',}
         request_baseurl = "https://graph.facebook.com/"
         response = requests.post(request_baseurl, params=args)
+        json_response = json.loads(response.content)
 
+        # GET INITIAL FEEDBACK
+        _response_list = list()
+        for item in json_response:
+            _r_code = item["code"]
+            _r_body = json.loads(item["body"])
+            if _r_code == 200:
+                print "Success"
+                _paging = _r_body["paging"]
+                if _paging.get("next",False):
+                    print "Get correct"
+                    print re.findall("(?<=\.com).+",_paging["next"])#.string
+                else:
+                    print "No next"
+            elif _r_code == 400:
+                raise Exception("Error")
+            else:
+                logging.debug(_r_code, _r_body)
+#            print item["body"]#["paging"]
+            print item.keys()
         return response
 
 
