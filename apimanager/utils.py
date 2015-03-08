@@ -10,10 +10,20 @@ def split_series_into_batches(series):
     batched_arrays = np.array_split(array_segment, number_of_segments)
     return batched_arrays
 
-def batch_id_requests(data, url_base):
+def xstr(s):
+    if s is None:
+        return ''
+    return "?" + str(s)
+
+
+def batch_id_requests(id_arg_list, url_base,):
     list_of_batch_requests = list()
-    for i in data:
-        list_of_batch_requests.append({"method":"GET","relative_url":i + url_base})
+    # if not optional_args:
+    #     optional_args = list()
+    #     for i in range(len(data)):
+    #         optional_args.append("")
+    for _single_id, _opt_args in id_arg_list:
+        list_of_batch_requests.append({"method":"GET","relative_url":str(_single_id + url_base + xstr(_opt_args))})
     return list_of_batch_requests
 
 def extract_data_from_single_batch_response(response,as_type='dict'):

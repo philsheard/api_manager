@@ -7,6 +7,8 @@ import datetime
 import logging
 import time
 import re
+import urlparse
+import urllib
 
 import numpy as np
 
@@ -52,44 +54,74 @@ class RequestManager(object):
         self.access_token = access_token
 
     def run_test(self):
-        # for _single_id in self.id_list:
-        #     print _single_id
-        #     print self.url_base.format(page_id=_single_id,
-        #         access_token=self.access_token)
-
-        # NEEDS TO BE REFACTORED TO ONLY USE THE BATCH METHOD,
-        # SO THAT THERE IS CONSISTENCY. 
-        # If required later, a separate method using the 
-        # standard request format could work.
-
-        # INITIAL SETUP
-        args = {'access_token':self.access_token,
-            'batch':json.dumps(batch_id_requests(self.id_list, self.url_base)),
-            'include_headers':'false',}
-        request_baseurl = "https://graph.facebook.com/"
-        response = requests.post(request_baseurl, params=args)
-        json_response = json.loads(response.content)
-
-        # GET INITIAL FEEDBACK
+        _arg_list = None
+        _id_arg_list = [(_id_list_item,None) for _id_list_item in self.id_list]
+        print _id_arg_list
+        _batch_requests = json.dumps(batch_id_requests(_id_arg_list, self.url_base,))
         _response_list = list()
-        for item in json_response:
-            _r_code = item["code"]
-            _r_body = json.loads(item["body"])
-            if _r_code == 200:
-                print "Success"
-                _paging = _r_body["paging"]
-                if _paging.get("next",False):
-                    print "Get correct"
-                    print re.findall("(?<=\.com).+",_paging["next"])#.string
+
+        _continue = True
+        while _continue:
+        # for repeat in range(3):
+            args = {'access_token':self.access_token,
+                'batch':_batch_requests,
+                'include_headers':'false',}
+            request_baseurl = "https://graph.facebook.com/"
+            response = requests.post(request_baseurl, params=args)
+            json_response = json.loads(response.content)
+            _arg_list = list()
+
+            _id_arg_list = list()
+
+
+            for count, item in enumerate(json_response):
+                _r_code = item["code"]
+                _r_body = json.loads(item["body"])
+
+                if _r_code == 200:
+                    logging.info("Status code {code}".format(code=_r_code))
+
+                    if "paging" in _r_body:
+                        _paging = _r_body["paging"]
+
+
+### NEED TO ADD:
+### - CHECK FOR END DATES
+### - HANDLING FOR OAUTH
+
+
+                        if _paging.get("next",False):
+                            logging.debug("Paging 'next' exists")
+                            _query_str = urlparse.urlparse(_paging["next"]).query
+                            _query_args = urlparse.parse_qsl(_query_str)
+                            _new_args = dict()
+
+                            for key, value in _query_args:
+                                _new_args[key] = value
+
+                            if "access_token" in _new_args:
+                                del(_new_args["access_token"])
+                            _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
+                        else:
+                            print "No next"
+                    else:
+                        _complete = False
+                elif _r_code == 400:
+                    print _r_body
+                    raise Exception("Error")
                 else:
-                    print "No next"
-            elif _r_code == 400:
-                raise Exception("Error")
-            else:
-                logging.debug(_r_code, _r_body)
-#            print item["body"]#["paging"]
-            print item.keys()
-        return response
+                    logging.debug(_r_code, _r_body)
+            print _id_arg_list
+            _batch_requests = json.dumps(batch_id_requests(_id_arg_list, self.url_base,))
+#   REMOVING THIS TEMPORARILY, SO THAT WE CAN RESPOND ONLY WITH THE
+#   VALID BODY. MIGHT NEED TO BECOME MORE SOPHISITICATED IN TIME.
+#            _response_list.append(response)
+            print _r_body
+            _response_list = _response_list + _r_body["data"]
+
+### WORKS FOR STREAMS, BUT NOT FOR SINGLE LAYER REQUESTS. INVESTIGATE FURTHER.
+
+        return _response_list
 
 
     def run(self):
