@@ -61,8 +61,11 @@ class RequestManager(object):
         _response_list = list()
 
         _continue = True
-        while _continue:
-        # for repeat in range(3):
+
+        ps_counter = 0
+        logging.debug("Initial setup completed")
+        while _continue == True and ps_counter < 2:
+            ps_counter = ps_counter + 1
             args = {'access_token':self.access_token,
                 'batch':_batch_requests,
                 'include_headers':'false',}
@@ -85,9 +88,9 @@ class RequestManager(object):
                         _paging = _r_body["paging"]
 
 
-### NEED TO ADD:
-### - CHECK FOR END DATES
-### - HANDLING FOR OAUTH
+            ### NEED TO ADD:
+            ### - CHECK FOR END DATES
+            ### - HANDLING FOR OAUTH
 
 
                         if _paging.get("next",False):
@@ -105,21 +108,30 @@ class RequestManager(object):
                         else:
                             print "No next"
                     else:
-                        _complete = False
+                        _continue = False
                 elif _r_code == 400:
-                    print _r_body
                     raise Exception("Error")
                 else:
                     logging.debug(_r_code, _r_body)
             print _id_arg_list
             _batch_requests = json.dumps(batch_id_requests(_id_arg_list, self.url_base,))
-#   REMOVING THIS TEMPORARILY, SO THAT WE CAN RESPOND ONLY WITH THE
-#   VALID BODY. MIGHT NEED TO BECOME MORE SOPHISITICATED IN TIME.
-#            _response_list.append(response)
-            print _r_body
-            _response_list = _response_list + _r_body["data"]
+            #   REMOVING THIS TEMPORARILY, SO THAT WE CAN RESPOND ONLY WITH THE
+            #   VALID BODY. MIGHT NEED TO BECOME MORE SOPHISITICATED IN TIME.
+            #   _response_list.append(response)
+            print ps_counter
 
 ### WORKS FOR STREAMS, BUT NOT FOR SINGLE LAYER REQUESTS. INVESTIGATE FURTHER.
+### PROBLEM IN THIS SECTION IS THAT THE RESPONSES ARE VARIED (LISTS VS DICTS)
+### AND SO THERE NEEDS TO BE A COMMON WAY TO RETURN THE VALUES
+
+            print _r_body
+            if "data" in _r_body:
+                _latest_responses = _r_body["data"]
+            else:
+                _latest_responses = _r_body
+            _response_list = _response_list + _latest_responses
+
+
 
         return _response_list
 
