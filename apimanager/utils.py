@@ -15,6 +15,25 @@ def xstr(s):
         return ''
     return "?" + str(s)
 
+def format_batch_item(item_tuple, url_base,):
+    list_of_batch_requests = list()
+#     # # if not optional_args:
+#     # #     optional_args = list()
+#     # #     for i in range(len(data)):
+#     # #         optional_args.append("")
+    formatted_request_item = {"method":"GET","relative_url":str(item_tuple[0] + url_base + xstr(item_tuple[1]))}
+    return formatted_request_item
+    # pass
+
+# def format_request(item_tuple, url_base,):
+#     # list_of_batch_requests = list()
+#     # # if not optional_args:
+#     # #     optional_args = list()
+#     # #     for i in range(len(data)):
+#     # #         optional_args.append("")
+#     # formatted_request_item = {"method":"GET","relative_url":str(item_tuple[0] + url_base + xstr(item_tuple[1]))})
+#     # return formatted_request_item
+#     pass
 
 def batch_id_requests(id_arg_list, url_base,):
     list_of_batch_requests = list()

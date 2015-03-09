@@ -14,7 +14,7 @@ import numpy as np
 
 import sys
 
-from .utils import split_series_into_batches, batch_id_requests, extract_data_from_single_batch_response, error_checker
+from .utils import xstr, format_batch_item, split_series_into_batches, batch_id_requests, extract_data_from_single_batch_response, error_checker
 
 """
 apimanager.core
@@ -54,84 +54,68 @@ class RequestManager(object):
         self.access_token = access_token
 
     def run_test(self):
-        _arg_list = None
+        # Setup initial list of request items
         _id_arg_list = [(_id_list_item,None) for _id_list_item in self.id_list]
-        print _id_arg_list
-        _batch_requests = json.dumps(batch_id_requests(_id_arg_list, self.url_base,))
+
+
         _response_list = list()
-
-        _continue = True
-
         ps_counter = 0
         logging.debug("Initial setup completed")
-        while _continue == True and ps_counter < 2:
+
+        while _id_arg_list and ps_counter < 2: #Working to remove this
+            logging.debug("Entering an iteration of the loop")
             ps_counter = ps_counter + 1
-            args = {'access_token':self.access_token,
-                'batch':_batch_requests,
-                'include_headers':'false',}
+            _request_queue = list()
+
+            while _id_arg_list:
+                _item = _id_arg_list.pop()
+                _request_queue.append(format_batch_item(_item, self.url_base,))
+
             request_baseurl = "https://graph.facebook.com/"
+            args = {'access_token':self.access_token,
+                'batch':json.dumps(_request_queue),
+                'include_headers':'false',}
             response = requests.post(request_baseurl, params=args)
             json_response = json.loads(response.content)
-            _arg_list = list()
-
-            _id_arg_list = list()
-
 
             for count, item in enumerate(json_response):
-                _r_code = item["code"]
                 _r_body = json.loads(item["body"])
-
-                if _r_code == 200:
-                    logging.info("Status code {code}".format(code=_r_code))
-
-                    if "paging" in _r_body:
-                        _paging = _r_body["paging"]
-
-
-            ### NEED TO ADD:
-            ### - CHECK FOR END DATES
-            ### - HANDLING FOR OAUTH
-
-
-                        if _paging.get("next",False):
-                            logging.debug("Paging 'next' exists")
-                            _query_str = urlparse.urlparse(_paging["next"]).query
-                            _query_args = urlparse.parse_qsl(_query_str)
-                            _new_args = dict()
-
-                            for key, value in _query_args:
-                                _new_args[key] = value
-
-                            if "access_token" in _new_args:
-                                del(_new_args["access_token"])
-                            _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
-                        else:
-                            print "No next"
-                    else:
-                        _continue = False
-                elif _r_code == 400:
+                if item["code"] == 200:
+                    logging.info("Status code {code}".format(code=item["code"]))
+                    _response_list.append(_r_body)
+                elif item["code"] == 400:
                     raise Exception("Error")
                 else:
-                    logging.debug(_r_code, _r_body)
-            print _id_arg_list
-            _batch_requests = json.dumps(batch_id_requests(_id_arg_list, self.url_base,))
-            #   REMOVING THIS TEMPORARILY, SO THAT WE CAN RESPOND ONLY WITH THE
-            #   VALID BODY. MIGHT NEED TO BECOME MORE SOPHISITICATED IN TIME.
-            #   _response_list.append(response)
-            print ps_counter
+                    logging.debug(item["code"], _r_body)
+                    raise Exception("Unknown Error")
+                print "Number of responses: {len_here}".format(len_here=len(_r_body["data"]))
+                print "---"
+                print _r_body["data"][-1]
+                print "---"
+                if "paging" in _r_body:
+                    ### NEED TO:
+                    ### - CHECK FOR END DATES
+                    ### - HANDLING FOR OAUTH
+                    if "next" in _r_body["paging"]:
+                        logging.debug("Paging 'next' exists")
 
-### WORKS FOR STREAMS, BUT NOT FOR SINGLE LAYER REQUESTS. INVESTIGATE FURTHER.
-### PROBLEM IN THIS SECTION IS THAT THE RESPONSES ARE VARIED (LISTS VS DICTS)
-### AND SO THERE NEEDS TO BE A COMMON WAY TO RETURN THE VALUES
+                        _query_str = urlparse.urlparse(_r_body["paging"]["next"]).query
+                        _query_args = urlparse.parse_qsl(_query_str)
 
-            print _r_body
-            if "data" in _r_body:
-                _latest_responses = _r_body["data"]
-            else:
-                _latest_responses = _r_body
-            _response_list = _response_list + _latest_responses
+                        _new_args = dict()
+                        for key, value in _query_args:
+                            _new_args[key] = value
+                        if "access_token" in _new_args:
+                            del(_new_args["access_token"])
 
+                        _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
 
+                    else:
+                        logging.debug("No 'next' in paging.")
+    
+        ### WORKS FOR STREAMS, BUT NOT FOR SINGLE LAYER REQUESTS. INVESTIGATE FURTHER.
+        ### PROBLEM IN THIS SECTION IS THAT THE RESPONSES ARE VARIED (LISTS VS DICTS)
+        ### AND SO THERE NEEDS TO BE A COMMON WAY TO RETURN THE VALUES
 
         return _response_list
 
