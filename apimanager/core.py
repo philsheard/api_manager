@@ -50,21 +50,36 @@ class RequestManager(object):
 
         if date_end:
             self.date_end = date_end
+        else:
+            self.date_end = None
 
         self.access_token = access_token
 
     def run_test(self):
+
+        ''' 
+        Will create single layer request by default. To get a stream of updates,
+        the endpoint will need to have a 'paging' key in the response, and you
+        need to set a 'date_end' paramater that can be parsed by Pandas to_datetime.
+
+        Returns a basic list of responses for now, which could be improved.
+        '''
+
+        if self.date_end:
+            _date_end = pd.to_datetime(self.date_end)
+        else:
+            _date_end = datetime.now()
+
         # Setup initial list of request items
         _id_arg_list = [(_id_list_item,None) for _id_list_item in self.id_list]
-
 
         _response_list = list()
         ps_counter = 0
         logging.debug("Initial setup completed")
 
-        while _id_arg_list and ps_counter < 5: #Working to remove this
+        while _id_arg_list # TEMP REMOVE and ps_counter < 5: #Working to remove this
             logging.debug("Entering an iteration of the loop")
-            ps_counter = ps_counter + 1
+            # TEMP REMOVE ps_counter = ps_counter + 1
             _request_queue = list()
 
             while _id_arg_list:
@@ -75,28 +90,27 @@ class RequestManager(object):
             args = {'access_token':self.access_token,
                 'batch':json.dumps(_request_queue),
                 'include_headers':'false',}
+
             response = requests.post(request_baseurl, params=args)
+
             json_response = json.loads(response.content)
             for count, item in enumerate(json_response):
-#                print type(json.loads(item))
                 _r_body = json.loads(item["body"])
                 if item["code"] == 200:
                     logging.info("Status code {code}".format(code=item["code"]))
                     _response_list.append(_r_body)
                 elif item["code"] == 400:
-                    raise Exception("Error")
+                    # This needs to be improved to handle timouts and valid
+                    # errors that should create a pause, rather than an end.
+                    raise Exception("Error code")
                 else:
                     logging.debug(item["code"], _r_body)
                     raise Exception("Unknown Error")
-                print "Number of responses: {len_here}".format(len_here=len(_r_body["data"]))
-                print "---"
-                print _r_body["data"][-1]
-                print "---"
+
                 if "paging" in _r_body:
-                    ### NEED TO:
-                    ### - CHECK FOR END DATES
-                    ### - HANDLING FOR OAUTH
-                    if "next" in _r_body["paging"]:
+                    logging.info("Paging loop begins")
+                    print pd.to_datetime(_r_body["data"][-1]["created_time"])
+                    if "next" in _r_body["paging"] and pd.to_datetime(_r_body["data"][-1]["created_time"]) > _date_end:
                         logging.debug("Paging 'next' exists")
 
                         _query_str = urlparse.urlparse(_r_body["paging"]["next"]).query
@@ -110,13 +124,8 @@ class RequestManager(object):
 
                         _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
 
-                    else:
-                        logging.debug("No 'next' in paging.")
-    
-        ### WORKS FOR STREAMS, BUT NOT FOR SINGLE LAYER REQUESTS. INVESTIGATE FURTHER.
-        ### PROBLEM IN THIS SECTION IS THAT THE RESPONSES ARE VARIED (LISTS VS DICTS)
-        ### AND SO THERE NEEDS TO BE A COMMON WAY TO RETURN THE VALUES
-
+                else:
+                    logging.debug("No paging.")
         return _response_list
 
 
