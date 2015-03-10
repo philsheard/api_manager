@@ -62,7 +62,7 @@ class RequestManager(object):
         ps_counter = 0
         logging.debug("Initial setup completed")
 
-        while _id_arg_list and ps_counter < 2: #Working to remove this
+        while _id_arg_list and ps_counter < 5: #Working to remove this
             logging.debug("Entering an iteration of the loop")
             ps_counter = ps_counter + 1
             _request_queue = list()
@@ -77,8 +77,8 @@ class RequestManager(object):
                 'include_headers':'false',}
             response = requests.post(request_baseurl, params=args)
             json_response = json.loads(response.content)
-
             for count, item in enumerate(json_response):
+#                print type(json.loads(item))
                 _r_body = json.loads(item["body"])
                 if item["code"] == 200:
                     logging.info("Status code {code}".format(code=item["code"]))
