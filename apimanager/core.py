@@ -68,7 +68,7 @@ class RequestManager(object):
         if self.date_end:
             _date_end = pd.to_datetime(self.date_end)
         else:
-            _date_end = datetime.now()
+            _date_end = datetime.datetime.now()
 
         # Setup initial list of request items
         _id_arg_list = [(_id_list_item,None) for _id_list_item in self.id_list]
@@ -77,7 +77,7 @@ class RequestManager(object):
         ps_counter = 0
         logging.debug("Initial setup completed")
 
-        while _id_arg_list # TEMP REMOVE and ps_counter < 5: #Working to remove this
+        while _id_arg_list: # TEMP REMOVE and ps_counter < 5: #Working to remove this
             logging.debug("Entering an iteration of the loop")
             # TEMP REMOVE ps_counter = ps_counter + 1
             _request_queue = list()
@@ -93,48 +93,55 @@ class RequestManager(object):
 
             response = requests.post(request_baseurl, params=args)
 
-            json_response = json.loads(response.content)
-            for count, item in enumerate(json_response):
-                _r_body = json.loads(item["body"])
-                if item["code"] == 200:
-                    logging.info("Status code {code}".format(code=item["code"]))
-                    _response_list.append(_r_body)
-                elif item["code"] == 400:
-                    # This needs to be improved to handle timouts and valid
-                    # errors that should create a pause, rather than an end.
-                    raise Exception("Error code")
-                else:
-                    logging.debug(item["code"], _r_body)
-                    raise Exception("Unknown Error")
+            if response.status_code == 200:
+                json_response = json.loads(response.content)
+                for count, item in enumerate(json_response):
+                    if item["code"] == 200:
+                        _r_body = json.loads(item["body"])
+                        logging.info("Status code {code}".format(code=item["code"]))
+                        _response_list.append(_r_body)
+                    elif item["code"] == 400:
+                        # This needs to be improved to handle timouts and valid
+                        # errors that should create a pause, rather than an end.
+                        raise Exception("Error code")
+                    else:
+                        logging.debug(item["code"], _r_body)
+                        raise Exception("Unknown Error")
 
-                if "paging" in _r_body:
-                    logging.info("Paging loop begins")
-                    print pd.to_datetime(_r_body["data"][-1]["created_time"])
-                    if "next" in _r_body["paging"] and pd.to_datetime(_r_body["data"][-1]["created_time"]) > _date_end:
-                        logging.debug("Paging 'next' exists")
+                    if "paging" in _r_body:
+                        logging.info("Paging loop begins")
 
-                        _query_str = urlparse.urlparse(_r_body["paging"]["next"]).query
-                        _query_args = urlparse.parse_qsl(_query_str)
+                        # FOUND AN API WHERE THIS DOESN'T WORK
 
-                        _new_args = dict()
-                        for key, value in _query_args:
-                            _new_args[key] = value
-                        if "access_token" in _new_args:
-                            del(_new_args["access_token"])
+                        print _r_body["data"]
+                        if "next" in _r_body["paging"] and pd.to_datetime(_r_body["data"][-1]["created_time"]) > _date_end:
+                            logging.debug("Paging 'next' exists")
 
-                        _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
+                            _query_str = urlparse.urlparse(_r_body["paging"]["next"]).query
+                            _query_args = urlparse.parse_qsl(_query_str)
 
-                else:
-                    logging.debug("No paging.")
+                            _new_args = dict()
+                            for key, value in _query_args:
+                                _new_args[key] = value
+                            if "access_token" in _new_args:
+                                del(_new_args["access_token"])
+
+                            _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
+
+                    else:
+                        logging.debug("No paging.")
+            elif response.status_code == 400:
+                raise Exception(json.loads(response.content)["error"])
         return _response_list
 
 
     def run(self):
         _master_response_list = list()
+
         for _single_id in self.id_list:
             _string_url = str(self.url_base)
             _prepared_url = _string_url.format(page_id=_single_id, access_token=self.access_token)
-            _created_datetime = datetime.datetime.now() # Start from now
+            _created_datetime = datetime.now() # Start from now
             while _created_datetime > pd.to_datetime(self.date_end):
                 response = requests.get(_prepared_url)
                 logging.debug("Response successful")

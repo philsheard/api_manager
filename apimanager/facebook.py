@@ -56,3 +56,11 @@ def interactions(ids, access_token):
 	manager = RequestManager(ids=ids, url_base=url_base, access_token=access_token,)
 
 	return manager
+
+def insights_likes(ids, access_token, date_start=None, date_end=None):
+
+	url_base = "/insights/page_fans"
+
+	manager = RequestManager(ids=ids, url_base=url_base, access_token=access_token,)
+
+	return manager
