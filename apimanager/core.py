@@ -17,7 +17,8 @@ import sys
 import utils
 # from .utils import format_batch_item
 # from .utils import split_series_into_batches
-# from .utils import batch_id_requests, extract_data_from_single_batch_response, error_checker, response_parser
+# from .utils import batch_id_requests, extract_data_from_single_batch_response,
+# error_checker, response_parser
 
 """
 apimanager.core
@@ -28,9 +29,26 @@ Core functions to deal with API requests.
 
 class RequestManager(object):
 
-    def __init__(self, ids, url_base, access_token, date_start=None, date_end=None):
+    def _hopper_initial_fill(self):
+        params = {'access_token': self.access_token,}
+        if self.api_type == "stream":
+            self.hopper += [self.url_base.format(_id) + "?" + urllib.urlencode(params) 
+            for _id in self.id_list]
+        elif self.api_type == "single":
+            print "single"
+        elif self.api_type == "batch":
+            print "batch"
+        else:
+            raise Exception("Unknown api_type")
+
+        logging.debug("Initial hopper fill complete")
+
+
+    def __init__(self, ids, url_base, access_token, api_type, date_start=None, 
+        date_end=None,):
         
-        # Check whether ids contains a string or list. If it's a string, create a list of one for consistency
+        # Check whether ids contains a string or list. 
+        # If it's a string, create a list of one for consistency
         if isinstance(ids,str):
             self.id_list = [ids,]
             self.batch = False
@@ -43,10 +61,10 @@ class RequestManager(object):
         # Set the URL base provided in setup for this RequestManager instance
 
         self.url_base = None
-        if url_base:
+        if isinstance(url_base, str):
             self.url_base = url_base
         else:
-            self.url_base = "Wowser."
+            raise TypeError("url_base provided is not a string")
         
         if date_start:
             self.date_start = date_start
@@ -58,14 +76,25 @@ class RequestManager(object):
 
         self.access_token = access_token
 
+        if api_type not in ["stream", "single", "batch",]:
+            raise Exception("Invalid API type.")
+        else:
+            self.api_type = api_type
+
+        self.hopper = list()
+        self._hopper_initial_fill()
+
     def run_test(self):
 
         ''' 
-        Will create single layer request by default. To get a stream of updates,
-        the endpoint will need to have a 'paging' key in the response, and you
-        need to set a 'date_end' paramater that can be parsed by Pandas to_datetime.
+        Handles running of the actual requests to get data. Initial hopper of 
+        URLs to request is created at initialisation, based on the API type
+        called and the options provided. This method makes the requests and 
+        feeds them back. 
 
-        Returns a basic list of responses for now, which could be improved.
+        The only complex thing it needs to do is to know when to stop. This is
+        mainly based on a date range (especially for feeds) but other reasons
+        could be added in future.
         '''
 
         if self.date_end:
@@ -73,56 +102,42 @@ class RequestManager(object):
         else:
             _date_end = datetime.datetime.now()
 
-        # Setup initial list of request items
-        _id_arg_list = [(_id_list_item,None) for _id_list_item in self.id_list]
 
         _response_list = list()
         ps_counter = 0
-        logging.debug("Initial setup completed")
 
-        while _id_arg_list:
+        while self.hopper:
+            ps_counter += 1
             logging.debug("Entering an iteration of the loop")
-            _request_queue = list()
+            _current_request = self.hopper.pop()
+            # print _current_request
+            response = requests.get(_current_request)
+            encoded = response.content.encode("utf-8")
+            print encoded
+            _json_response = json.loads(encoded)
 
-            while _id_arg_list:
-                _item = _id_arg_list.pop()
-                _request_queue.append(utils.format_batch_item(_item, self.url_base,))
+            latest_response = _json_response
 
-            request_baseurl = "https://graph.facebook.com/"
-            args = {'access_token':self.access_token,
-                'batch':json.dumps(_request_queue),
-                'include_headers':'false',}
-
-            response = requests.post(request_baseurl, params=args)
-            _json_response = json.loads(response.content)
-            if response.status_code == 200:
-                for _item in _json_response:
-                    _json_item = json.loads(_item["body"])
-                    if not _json_item.get("error",None):
-                        # Save the output
-                        _response_list.append(_json_item)
-                    else:
-                        _error_message = "Error: {msg}".format(msg=_json_item["error"]) 
-                        raise Exception(_error_message)
-
-                    # Decide whether to proceed
-                    if utils.response_parser(_json_item, _date_end) == True:
-                        print "We will proceed."
-
-                        _query_str = urlparse.urlparse(_json_item["paging"]["next"]).query
-                        _query_args = urlparse.parse_qsl(_query_str)
-
-                        _new_args = dict()
-                        for key, value in _query_args:
-                            _new_args[key] = value
-                        if "access_token" in _new_args:
-                            del(_new_args["access_token"])
-
-                        _id_arg_list.append((self.id_list[count], urllib.urlencode(_new_args)))
-
+            if response.status_code == 200 and not _json_response.get("error"):
+                # @TODO - this is very FB specific, so need to adapt later
+                _response_list += _json_response["data"]
+            elif response.status_code == 200 and _json_response.get("error"):
+                _error_message = "Error: {msg}".format(msg=_json_item["error"]) 
+                raise Exception(_error_message)
             elif response.status_code == 400:
-                raise Exception(json.loads(response.content)["error"])
-        return _response_list
+                raise Exception(json.loads(response.content))
+            else:
+                print _json_response
+                print response.status_code
+                raise Exception("Unknown error")
+
+            # CHECK FOR PAGING
+            _latest_item_date = pd.to_datetime(_json_response["data"][-1]["created_time"])
+            # print _latest_item_date > _date_end
+            if _json_response.get("paging") and _latest_item_date > _date_end:# and ps_counter < 5: 
+                self.hopper.append(_json_response["paging"]["next"])
+
+        return _response_list, pd.DataFrame(_response_list), latest_response
 
 
     def run(self):
@@ -130,7 +145,8 @@ class RequestManager(object):
 
         for _single_id in self.id_list:
             _string_url = str(self.url_base)
-            _prepared_url = _string_url.format(page_id=_single_id, access_token=self.access_token)
+            _prepared_url = _string_url.format(page_id=_single_id,
+                access_token=self.access_token)
             _created_datetime = datetime.now() # Start from now
             while _created_datetime > pd.to_datetime(self.date_end):
                 response = requests.get(_prepared_url)
@@ -139,7 +155,8 @@ class RequestManager(object):
                 if _response_check == "VALID":
                     _response_dict = json.loads(response.content)
                     _master_response_list = _master_response_list + _response_dict["data"]
-                    _created_datetime = pd.to_datetime(_response_dict["data"][-1:][0]["created_time"])
+                    _created_datetime = pd.to_datetime(
+                        _response_dict["data"][-1:][0]["created_time"])
                     _prepared_url = json.loads(response.content)["paging"]["next"]
                     logging.info("Successful response: {id} - {created_datetime} oldest".format(
                         id=_single_id, created_datetime=_created_datetime))
@@ -147,7 +164,8 @@ class RequestManager(object):
                     _created_datetime = pd.to_datetime(self.date_end)
                 elif _response_check == "RATELIMIT":
                     _wait_seconds = 120
-                    logging.info("Rate limit reached. Waiting for {seconds} seconds".format(seconds=_wait_seconds))
+                    logging.info("Rate limit reached. Waiting for {seconds} seconds".format(
+                        seconds=_wait_seconds))
                     time.wait(_wait_seconds)
                 elif _response_check == "ERROR":
                     raise Exception("Unknown error check response.")
@@ -195,7 +213,8 @@ class RequestManager(object):
         response_tidy = json.loads(response.content.encode("utf-8"))
         if return_format == "pandas":
             output_series = pd.Series(response_tidy)
-            final_output = output_series.apply(lambda x: extract_data_from_single_batch_response(x,as_type="series"))
+            final_output = output_series.apply(lambda x: extract_data_from_single_batch_response(x,
+                as_type="series"))
         elif return_format == "raw":
             final_output = response_tidy
         else:

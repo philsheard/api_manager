@@ -73,24 +73,26 @@ def extract_data_from_single_batch_response(response,as_type='dict'):
         return results
 
 def response_parser(response, date_end):
+    _progress_decision = False
     if "paging" in response:
         logging.info("Paging exists.")
         _last_entry = response["data"][-1]
         if "created_time" in _last_entry:
-            if pd.to_datetime(_last_entry["created_time"]) > date_end:
+            if pd.to_datetime(_last_entry["created_time"]) >= date_end:
                 print "Further to go:"
                 print _last_entry["created_time"]
                 print date_end
                 _progress_decision = True
             else:
-                print _last_entry
-                raise Exception("What to look for?")                
+                print _last_entry.keys()
+                logging.info("Reached end date. Moving on.")
+                # raise Exception("What to look for?")                
         else:
+            print type(_last_entry)
             print _last_entry
             raise Exception("What to look for?")
     else:
         logging.info("Paging doesn't exist.")
-        _progress_decision = False
     return _progress_decision
 
 def error_checker(response):
