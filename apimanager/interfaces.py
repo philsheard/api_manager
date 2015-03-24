@@ -8,4 +8,4 @@ A set of interfaces that enable API access to common systems.
 """
 
 
-import facebook
+import facebook, instagram

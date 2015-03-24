@@ -30,12 +30,30 @@ Core functions to deal with API requests.
 class RequestManager(object):
 
     def _hopper_initial_fill(self):
-        params = {'access_token': self.access_token,}
+        if self._hopper_params:
+            raw_params = {'access_token': self.access_token,}
+            params = urllib.urlencode(raw_params)
+        else:
+            params = ""
+        
+        if "?" in self.url_base:
+            params = str("&" + params)
+        else:
+            print False
+            params = str("?" + params)
+
         if self.api_type == "stream":
-            self.hopper += [self.url_base.format(_id) + "?" + urllib.urlencode(params) 
+#            self.hopper += [self.url_base.format(_id) + "?" + params 
+            # Hopefully the above "?" section is fine so above version not needed.
+            # Still a bit hacky and should be revisited.
+            print "Params: {}".format(params)
+            print "URL Base: {}".format(self.url_base)
+            self.hopper += [str(self.url_base.format(_id) + params) 
             for _id in self.id_list]
         elif self.api_type == "single":
             print "single"
+            self.hopper += [self.url_base.format(_id) + params 
+            for _id in self.id_list]
         elif self.api_type == "batch":
             print "batch"
         else:
@@ -44,8 +62,40 @@ class RequestManager(object):
         logging.debug("Initial hopper fill complete")
 
 
+    def manage_paging(self, response):
+        return_url = False
+
+        # FACEBOOK
+        if "paging" in response:
+            try:
+                _latest_item_date = pd.to_datetime(response["data"][-1]["created_time"])
+            except:
+                _latest_item_date = None
+
+            if _latest_item_date > pd.to_datetime(self.date_end):# and ps_counter < 5: 
+                return_url = response["paging"]["next"]
+
+        # INSTAGRAM
+        elif "pagination" in response:
+            try:
+                _latest_item_date = pd.to_datetime(datetime.datetime.fromtimestamp(
+                    float(response["data"][-1]["created_time"])))
+            except:
+                _latest_item_date = None
+            if ("next_url" in response["pagination"]):
+                if (_latest_item_date) and (_latest_item_date >= pd.to_datetime(self.date_end)):
+                    logging.debug("Next URL valid and being added.")
+                    return_url = response["pagination"]["next_url"]
+
+        # Unknown API
+        else:
+            return_url = False
+#            raise Exception("Unknown API type.")
+
+        return return_url
+
     def __init__(self, ids, url_base, access_token, api_type, date_start=None, 
-        date_end=None,):
+        date_end=None,hopper_params=True):
         
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
@@ -81,10 +131,16 @@ class RequestManager(object):
         else:
             self.api_type = api_type
 
+        self._hopper_params = hopper_params
+
         self.hopper = list()
         self._hopper_initial_fill()
 
-    def run_test(self):
+    def run(self):
+        # @TODO:
+        # - Ability to return in different formats (raw, pandas, dict, etc)
+        # - Better handling of OAuth and delays
+        # - Start using "error_checker" like we had in the previous version below
 
         ''' 
         Handles running of the actual requests to get data. Initial hopper of 
@@ -96,51 +152,53 @@ class RequestManager(object):
         mainly based on a date range (especially for feeds) but other reasons
         could be added in future.
         '''
-
         if self.date_end:
             _date_end = pd.to_datetime(self.date_end)
         else:
             _date_end = datetime.datetime.now()
-
-
         _response_list = list()
-        ps_counter = 0
-
         while self.hopper:
-            ps_counter += 1
             logging.debug("Entering an iteration of the loop")
             _current_request = self.hopper.pop()
             # print _current_request
             response = requests.get(_current_request)
-            encoded = response.content.encode("utf-8")
-            print encoded
+            response.encoding = "latin-1"
+            encoded = response.content#.encode("utf-8")
             _json_response = json.loads(encoded)
-
             latest_response = _json_response
-
-            if response.status_code == 200 and not _json_response.get("error"):
+            if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
                 # @TODO - this is very FB specific, so need to adapt later
                 _response_list += _json_response["data"]
+            elif response.status_code == 200 and not _json_response.get("error") and all(k in _json_response.keys() for k in ["created_time",]):
+                # @FIXME - hack to get Facebook likes/comments/shares quickly
+                _response_list.append(_json_response)
             elif response.status_code == 200 and _json_response.get("error"):
                 _error_message = "Error: {msg}".format(msg=_json_item["error"]) 
                 raise Exception(_error_message)
+            elif response.status_code == 400 and json.loads(
+                    last_response["body"])["error"]["code"] == 613:
+                delay_time = 120
+                logging.info("API limit exceeded. Waiting for %s seconds" % (
+                    delay_time))
+                time.sleep(delay_time)
+                self.hopper.append(response.url)
+                raise Exception(json.loads(response.content))
             elif response.status_code == 400:
                 raise Exception(json.loads(response.content))
             else:
-                print _json_response
-                print response.status_code
+                # print _json_response
+                # print response.status_code
                 raise Exception("Unknown error")
-
             # CHECK FOR PAGING
-            _latest_item_date = pd.to_datetime(_json_response["data"][-1]["created_time"])
-            # print _latest_item_date > _date_end
-            if _json_response.get("paging") and _latest_item_date > _date_end:# and ps_counter < 5: 
-                self.hopper.append(_json_response["paging"]["next"])
+            # Hacky hack to get Instagram working
+            paging_check = self.manage_paging(_json_response)
+            if paging_check:
+                self.hopper.append(paging_check)
 
-        return _response_list, pd.DataFrame(_response_list), latest_response
+        return _response_list
 
 
-    def run(self):
+    def old_run(self):
         _master_response_list = list()
 
         for _single_id in self.id_list:
@@ -174,55 +232,3 @@ class RequestManager(object):
             else:
                 logging.info("Loop finished for {id}".format(id=_single_id))
         return _master_response_list
-
-    def batch_run(self, return_format="raw"):
-
-        list_of_responses = list()
-        OK_to_proceed = False
-
-        args = {'access_token':self.access_token,
-            'batch':json.dumps(batch_id_requests(self.id_list)),
-            'include_headers':'false',}
-        request_baseurl = "https://graph.facebook.com/"
-        while OK_to_proceed == False:
-            response = requests.post(request_baseurl, params=args)
-            try:
-                last_response = json.loads(response.content.encode("utf-8"))[-1]#["body"]
-                if last_response["code"] == 200:
-                    logging.debug("Loop passed")
-                    OK_to_proceed = True
-                elif last_response["code"] == 400:
-                    if json.loads(last_response["body"])["error"]["code"] == 613:
-                        delay_time = 120
-                        logging.info("API limit exceeded. Waiting for %s seconds" % (
-                            delay_time))
-                        time.sleep(delay_time)
-                    else:
-                        logging.warn("Unknown error - last response:\n{last_response}".format(
-                            last_response=last_response))
-                        raise Exception("Unknown error code.")
-                else:
-                    logging.warn("Unknown error - last response:\n{last_response}".format(
-                        last_response=last_response))
-                    raise Exception("Unknown error code.")
-            except:
-                logging.warn("Unknown error - sys error:\n{sys_error}".format(
-                    sys_error=sys.exc_info()[0]))
-                raise Exception("Unknown error code.")
-            # list_of_responses.append(response)
-        response_tidy = json.loads(response.content.encode("utf-8"))
-        if return_format == "pandas":
-            output_series = pd.Series(response_tidy)
-            final_output = output_series.apply(lambda x: extract_data_from_single_batch_response(x,
-                as_type="series"))
-        elif return_format == "raw":
-            final_output = response_tidy
-        else:
-            raise Exception("Unknown return_format supplied.")
-        return final_output
-
-    # def stream(self):
-    #     pass
-
-    # def collect(self):
-    #     pass

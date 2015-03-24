@@ -11,10 +11,11 @@ def create_manager():
 
 def feed(ids, access_token, date_start=None, date_end=None,):
 
-    url_base = "https://graph.facebook.com/v2.2/{page_id}/feed?access_token={access_token}"
+    # url_base = "https://graph.facebook.com/v2.2/{}/feed?access_token={}"
+    url_base = "https://graph.facebook.com/v2.2/{}/feed"
 
     manager = RequestManager(ids=ids, url_base=url_base, access_token=access_token, 
-        date_start=date_start, date_end=date_end)
+        api_type="stream", date_start=date_start, date_end=date_end)
 
     return manager
 
