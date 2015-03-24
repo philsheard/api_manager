@@ -35,17 +35,13 @@ class RequestManager(object):
             params = urllib.urlencode(raw_params)
         else:
             params = ""
-        
+        # @TODO - This handling params is hacky and needs to be changed.
         if "?" in self.url_base:
             params = str("&" + params)
         else:
             print False
             params = str("?" + params)
-
         if self.api_type == "stream":
-#            self.hopper += [self.url_base.format(_id) + "?" + params 
-            # Hopefully the above "?" section is fine so above version not needed.
-            # Still a bit hacky and should be revisited.
             print "Params: {}".format(params)
             print "URL Base: {}".format(self.url_base)
             self.hopper += [str(self.url_base.format(_id) + params) 
