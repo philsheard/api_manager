@@ -1,4 +1,3 @@
-import datetime
 import numpy as np
 import json
 import logging
@@ -9,41 +8,6 @@ def split_series_into_batches(series):
     number_of_segments = array_segment.shape[0]/25
     batched_arrays = np.array_split(array_segment, number_of_segments)
     return batched_arrays
-
-def xstr(s):
-    if s is None:
-        return ''
-    return "?" + str(s)
-
-def format_batch_item(item_tuple, url_base,):
-    list_of_batch_requests = list()
-#     # # if not optional_args:
-#     # #     optional_args = list()
-#     # #     for i in range(len(data)):
-#     # #         optional_args.append("")
-    formatted_request_item = {"method":"GET","relative_url":str(item_tuple[0] + url_base + xstr(item_tuple[1]))}
-    return formatted_request_item
-    # pass
-
-# def format_request(item_tuple, url_base,):
-#     # list_of_batch_requests = list()
-#     # # if not optional_args:
-#     # #     optional_args = list()
-#     # #     for i in range(len(data)):
-#     # #         optional_args.append("")
-#     # formatted_request_item = {"method":"GET","relative_url":str(item_tuple[0] + url_base + xstr(item_tuple[1]))})
-#     # return formatted_request_item
-#     pass
-
-def batch_id_requests(id_arg_list, url_base,):
-    list_of_batch_requests = list()
-    # if not optional_args:
-    #     optional_args = list()
-    #     for i in range(len(data)):
-    #         optional_args.append("")
-    for _single_id, _opt_args in id_arg_list:
-        list_of_batch_requests.append({"method":"GET","relative_url":str(_single_id + url_base + xstr(_opt_args))})
-    return list_of_batch_requests
 
 def extract_data_from_single_batch_response(response,as_type='dict'):
     # @TODO - MAKE THIS FLEXIBLE TO TAKE DYNAMIC FIELDS
@@ -72,34 +36,7 @@ def extract_data_from_single_batch_response(response,as_type='dict'):
     else:
         return results
 
-def response_parser(response, date_end):
-    _progress_decision = False
-    if "paging" in response:
-        logging.info("Paging exists.")
-        _last_entry = response["data"][-1]
-        if "created_time" in _last_entry:
-            if pd.to_datetime(_last_entry["created_time"]) >= date_end:
-                print "Further to go:"
-                print _last_entry["created_time"]
-                print date_end
-                _progress_decision = True
-            else:
-                print _last_entry.keys()
-                logging.info("Reached end date. Moving on.")
-                # raise Exception("What to look for?")                
-        else:
-            print type(_last_entry)
-            print _last_entry
-            raise Exception("What to look for?")
-    else:
-        logging.info("Paging doesn't exist.")
-    return _progress_decision
-
 def error_checker(response):
-    # This is just the single-stream version. Need to merge into the batch version,
-    # which is slightly more advanced (it handled OAuth errors better and will
-    # hang back when needed).
-
     _return_value = "ERROR" # Default option 
     _response_dict = json.loads(response.content)
     if response.status_code == 200 and _response_dict.get("data",None) is True:
@@ -116,10 +53,6 @@ def error_checker(response):
         # status code check for 200, but it's a backstop just in case.
         raise Exception('There was an error. Could be innocent, like a rate limit error.')
     else:
-        # Provide a condition for the loop to end gracefully
-#        _created_datetime = pd.to_datetime(self.date_end)
-        print response.content
-        raise Exception('Unknown error - might need to assess whether it has run out of data.')
-#        logging.warning('Some sort of unknown error took place. Investigate.') # will print a message to the console
+       raise Exception('Some sort of unknown error took place. Investigate.')
 
     return _return_value
