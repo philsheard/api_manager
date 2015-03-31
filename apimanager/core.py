@@ -9,6 +9,7 @@ import time
 import re
 import urlparse
 import urllib
+import pytz
 
 import numpy as np
 
@@ -41,6 +42,7 @@ class RequestManager(object):
         else:
             print False
             params = str("?" + params)
+
         if self.api_type == "stream":
             print "Params: {}".format(params)
             print "URL Base: {}".format(self.url_base)
@@ -157,28 +159,40 @@ class RequestManager(object):
             logging.debug("Entering an iteration of the loop")
             _current_request = self.hopper.pop()
             # print _current_request
+
+            _request_made = datetime.datetime.utcnow()
+            _request_made = _request_made.replace(tzinfo=pytz.utc)
+            print _request_made
             response = requests.get(_current_request)
             response.encoding = "latin-1"
             encoded = response.content#.encode("utf-8")
             _json_response = json.loads(encoded)
-            latest_response = _json_response
+            _json_response["request_made"] = _request_made
             if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
                 # @TODO - this is very FB specific, so need to adapt later
-                _response_list += _json_response["data"]
+                _individual_results = _json_response["data"]
+                for counter, i in enumerate(_individual_results):
+                    _individual_results[counter]["_request_made"] = _request_made
+                _response_list += _individual_results
             elif response.status_code == 200 and not _json_response.get("error") and all(k in _json_response.keys() for k in ["created_time",]):
                 # @FIXME - hack to get Facebook likes/comments/shares quickly
-                _response_list.append(_json_response)
+                _individual_results = _json_response
+                for counter, i in enumerate(_individual_results):
+                    _individual_results[counter]["_request_made"] = _request_made
+                _response_list.append(_individual_results)
             elif response.status_code == 200 and _json_response.get("error"):
                 _error_message = "Error: {msg}".format(msg=_json_item["error"]) 
                 raise Exception(_error_message)
-            elif response.status_code == 400 and json.loads(
-                    last_response["body"])["error"]["code"] == 613:
-                delay_time = 120
-                logging.info("API limit exceeded. Waiting for %s seconds" % (
-                    delay_time))
-                time.sleep(delay_time)
-                self.hopper.append(response.url)
-                raise Exception(json.loads(response.content))
+
+            ### NEED TO WORK TO INTEGRATE THIS CONCEPT
+            # elif response.status_code == 400 and json.loads(
+            #         _json_response["body"])["error"]["code"] == 613:
+            #     delay_time = 120
+            #     logging.info("API limit exceeded. Waiting for %s seconds" % (
+            #         delay_time))
+            #     time.sleep(delay_time)
+            #     self.hopper.append(response.url)
+            #     raise Exception(json.loads(response.content))
             elif response.status_code == 400:
                 raise Exception(json.loads(response.content))
             else:
