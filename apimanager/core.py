@@ -171,6 +171,8 @@ class RequestManager(object):
             if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
                 # @TODO - this is very FB specific, so need to adapt later
                 _individual_results = _json_response["data"]
+                # print _json_response.keys()
+                # print _json_response["data"]
                 for counter, i in enumerate(_individual_results):
                     _individual_results[counter]["_request_made"] = _request_made
                 _response_list += _individual_results

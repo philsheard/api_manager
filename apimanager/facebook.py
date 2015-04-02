@@ -34,6 +34,14 @@ def feed_test_b(ids, access_token, date_start=None, date_end=None,):
     	access_token=access_token, api_type=_api_type,)
     return manager
 
+
+def insights_fans(ids, access_token, date_start=None, date_end=None,):
+    url_base = "https://graph.facebook.com/v2.2/{}/insights/page_fans"
+    _api_type = "single"
+    manager = RequestManager(ids=ids, url_base=url_base, 
+        access_token=access_token, api_type=_api_type,)
+    return manager
+
 def promotable_posts(ids, access_token, date_start=None, date_end=None,):
 
     url_base = "https://graph.facebook.com/v2.2/{page_id}/promotable_posts?access_token={access_token}"
