@@ -37,8 +37,9 @@ def feed_test_b(ids, access_token, date_start=None, date_end=None,):
 
 def insights_fans(ids, access_token, date_start=None, date_end=None,):
     url_base = "https://graph.facebook.com/v2.2/{}/insights/page_fans"
-    _api_type = "single"
-    manager = RequestManager(ids=ids, url_base=url_base, 
+    _api_type = "batch"
+    manager = RequestManager(ids=ids, url_base=url_base,
+        date_start=date_start, date_end=date_end,
         access_token=access_token, api_type=_api_type,)
     return manager
 

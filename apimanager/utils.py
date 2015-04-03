@@ -56,3 +56,32 @@ def error_checker(response):
        raise Exception('Some sort of unknown error took place. Investigate.')
 
     return _return_value
+
+def api_call_time_windows(start, end, freq=90):
+    _start = pd.to_datetime(start)
+    _end = pd.to_datetime(end)
+    range_with_intervals = pd.date_range(start=_start, end=_end, freq=(freq * pd.datetools.day))
+    converted_to_list = range_with_intervals.to_pydatetime().tolist()
+    if converted_to_list[-1] < _end:
+        converted_to_list.append(_end.to_pydatetime())
+    dates_as_integer = pd.Series(converted_to_list).astype(int) // 10**9
+    print dates_as_integer
+    return zip(dates_as_integer[:-1],dates_as_integer[1:])
+
+#     _start_timestamp, _end_timestamp = pd.to_datetime((_start,_end))
+#     print _start_timestamp, _end_timestamp
+#     time_periods = pd.date_range(start=_start_timestamp,
+#                                     end=_endend_timestamp,
+#                                     freq=_freq,
+# # @TODO - this method needs to be timezone-aware in future.
+# #                                     tz="UTC",
+# #                                      tz=None,
+# #                                      normalize=True,
+#                                      )
+#         # _all_timestamps = pd.Series([start_timestamp,] + list(pd.to_datetime(time_periods.values,))+ [end_timestamp,])
+#         # _all_timestamps.sort(inplace=True)
+#         # _all_timestamps = _all_timestamps.unique()
+#         # _all_timestamps = _all_timestamps.astype(int) // 10**9
+#         # return zip(_all_timestamps[:-1],_all_timestamps[1:])
+#     return time_periods
+

@@ -10,6 +10,7 @@ import re
 import urlparse
 import urllib
 import pytz
+import itertools
 
 import numpy as np
 
@@ -44,16 +45,34 @@ class RequestManager(object):
             params = str("?" + params)
 
         if self.api_type == "stream":
+            logging.debug("API type: {}".format(self.api_type))
             print "Params: {}".format(params)
             print "URL Base: {}".format(self.url_base)
             self.hopper += [str(self.url_base.format(_id) + params) 
             for _id in self.id_list]
         elif self.api_type == "single":
-            print "single"
+            logging.debug("API type: {}".format(self.api_type))
             self.hopper += [self.url_base.format(_id) + params 
             for _id in self.id_list]
         elif self.api_type == "batch":
-            print "batch"
+            logging.debug("API type: {}".format(self.api_type))
+
+#        def collect_data_from_facebook_api(time_windows, pages, access_token):
+            response_list = list()
+            time_windows = utils.api_call_time_windows(self.date_start, self.date_end)
+            merged_combo = itertools.product(time_windows, self.id_list,)
+            # for item in  merged_combo:
+            #     print item
+            # print "Next section"
+            for combo in merged_combo:
+                params = {"access_token": self.access_token,
+                          "since":combo[0][0],
+                          "until":combo[0][1]}
+                params = urllib.urlencode(params)
+                page_name = combo[1]
+                self.hopper += [self.url_base.format(page_name) + "?" + params]
+            # return response_list
+            # raise Exception("This hasn't been implemented yet!")
         else:
             raise Exception("Unknown api_type")
 
@@ -158,21 +177,17 @@ class RequestManager(object):
         while self.hopper:
             logging.debug("Entering an iteration of the loop")
             _current_request = self.hopper.pop()
-            # print _current_request
-
             _request_made = datetime.datetime.utcnow()
             _request_made = _request_made.replace(tzinfo=pytz.utc)
-            print _request_made
+            logging.debug("Request sent timestamp: {}".format(_request_made))
             response = requests.get(_current_request)
-            response.encoding = "latin-1"
-            encoded = response.content#.encode("utf-8")
-            _json_response = json.loads(encoded)
+#            response.encoding = "latin-1"
+#            encoded = response.content#.encode("utf-8")
+            _json_response = json.loads(response.content)
             _json_response["request_made"] = _request_made
             if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
                 # @TODO - this is very FB specific, so need to adapt later
                 _individual_results = _json_response["data"]
-                # print _json_response.keys()
-                # print _json_response["data"]
                 for counter, i in enumerate(_individual_results):
                     _individual_results[counter]["_request_made"] = _request_made
                 _response_list += _individual_results
