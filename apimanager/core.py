@@ -11,6 +11,7 @@ import urlparse
 import urllib
 import pytz
 import itertools
+from functools import partial
 
 import numpy as np
 
@@ -57,13 +58,9 @@ class RequestManager(object):
         elif self.api_type == "batch":
             logging.debug("API type: {}".format(self.api_type))
 
-#        def collect_data_from_facebook_api(time_windows, pages, access_token):
             response_list = list()
             time_windows = utils.api_call_time_windows(self.date_start, self.date_end)
             merged_combo = itertools.product(time_windows, self.id_list,)
-            # for item in  merged_combo:
-            #     print item
-            # print "Next section"
             for combo in merged_combo:
                 params = {"access_token": self.access_token,
                           "since":combo[0][0],
@@ -71,48 +68,70 @@ class RequestManager(object):
                 params = urllib.urlencode(params)
                 page_name = combo[1]
                 self.hopper += [self.url_base.format(page_name) + "?" + params]
-            # return response_list
-            # raise Exception("This hasn't been implemented yet!")
         else:
             raise Exception("Unknown api_type")
 
         logging.debug("Initial hopper fill complete")
 
+    def convert_stopper_time(self, stopper):
+        print "Let's begin"
+        print stopper
+        if type(stopper) is not list:
+            stopper = [stopper,]
+        print stopper
+        _paging_func, _paging_args = self._pagination["formatter"]
+        result = _paging_func(stopper,_paging_args)
+        print result
+        return result
+#        _formatter = partial(_paging_func, _paging_args)
+
 
     def manage_paging(self, response):
         return_url = False
+        # print type(response)
+        # print response.keys()
+        _end_goal = self._pagination["end_goal"]
+        # print _end_goal
+        _loc_to_check_against_goal = self._pagination["path"]
+        # print _loc_to_check_against_goal
+        
+        try:
+            print self._pagination
+            _stopper = reduce(lambda x,y: x[y], _loc_to_check_against_goal, response)
+        except:
+            raise Exception("Couldn't match the stopper location")
 
-        # FACEBOOK
-        if "paging" in response:
+        print "Got here"
+        print _stopper
+
+        print "La di da"
+
+        _final_stopper = datetime_formatter(_stopper)
+        print _final_stopper
+        # try:
+        #     print "About to process stopper"
+        #     _final_stopper = convert_stopper_time(_stopper)
+        #     print _final_stopper
+        # except:
+        #     raise Exception("Couldn't format the stopper")
+
+
+        _next_url_loc = self._pagination["pagination_scheme"]
+        # latest_post_time > pd.to_datetime(self.date_end):
+        print _end_goal
+        if _final_stopper > _end_goal:
+            print "Progress"
             try:
-                _latest_item_date = pd.to_datetime(response["data"][-1]["created_time"])
+                _next_url = reduce(lambda x, y: x[y], _next_url_loc, response)
             except:
-                _latest_item_date = None
-
-            if _latest_item_date > pd.to_datetime(self.date_end):# and ps_counter < 5: 
-                return_url = response["paging"]["next"]
-
-        # INSTAGRAM
-        elif "pagination" in response:
-            try:
-                _latest_item_date = pd.to_datetime(datetime.datetime.fromtimestamp(
-                    float(response["data"][-1]["created_time"])))
-            except:
-                _latest_item_date = None
-            if ("next_url" in response["pagination"]):
-                if (_latest_item_date) and (_latest_item_date >= pd.to_datetime(self.date_end)):
-                    logging.debug("Next URL valid and being added.")
-                    return_url = response["pagination"]["next_url"]
-
-        # Unknown API
+                raise Exception("Path to next URL wasn't right")
         else:
-            return_url = False
-#            raise Exception("Unknown API type.")
+            _next_url = False
+        return _next_url
 
-        return return_url
 
     def __init__(self, ids, url_base, access_token, api_type, date_start=None, 
-        date_end=None,hopper_params=True):
+        date_end=None,hopper_params=True, pagination=None):
         
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
@@ -147,6 +166,8 @@ class RequestManager(object):
             raise Exception("Invalid API type.")
         else:
             self.api_type = api_type
+
+        self._pagination = pagination
 
         self._hopper_params = hopper_params
 
@@ -212,15 +233,16 @@ class RequestManager(object):
             #     raise Exception(json.loads(response.content))
             elif response.status_code == 400:
                 raise Exception(json.loads(response.content))
+            elif response.status_code == 404 and _json_response.get("error"):
+                raise Exception(_json_response["error"])
             else:
-                # print _json_response
-                # print response.status_code
-                raise Exception("Unknown error")
-            # CHECK FOR PAGING
-            # Hacky hack to get Instagram working
-            paging_check = self.manage_paging(_json_response)
-            if paging_check:
-                self.hopper.append(paging_check)
+                print response.status_code
+                raise Exception("Unknown error/nCode: {}/n Response:{}".format(response.status_code,response.content))
+
+            if self._pagination:
+                next_url_check = self.manage_paging(_json_response)
+                if next_url_check:
+                    self.hopper.append(next_url_check)
 
         return _response_list
 

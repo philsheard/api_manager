@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 from .core import RequestManager
+import pandas as pd
+import datetime#from datetime.datetime import fromtimestamp
+
+pagination_scheme = ('pagination','next_url')
 
 def users_search(ids, client_id,):
     _url_base = str("https://api.instagram.com/v1/users/search?q={}&client_id=" + client_id)
@@ -14,9 +18,18 @@ def users_search(ids, client_id,):
 def user_media(ids, client_id, date_start=None, date_end=None,):
     _url_base = str("https://api.instagram.com/v1/users/{}/media/recent/?client_id=" + client_id)
     _api_type = "stream"
+
+
+    pagination = {'pagination_scheme': pagination_scheme,
+                  'path': ('data',-1,"created_time"),
+                  'end_goal': pd.to_datetime(date_end),
+                  'formatter': (datetime.datetime.fromtimestamp, "s")}
+
+
     manager = RequestManager(ids=ids, url_base=_url_base, 
     	access_token=client_id, api_type=_api_type, 
-    	date_start=date_start, date_end=date_end,hopper_params=False)
+    	date_start=date_start, date_end=date_end,hopper_params=False,
+        pagination=pagination)
     return manager
 
 def tag_media(ids, client_id, date_start=None, date_end=None,):

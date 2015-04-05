@@ -85,3 +85,5 @@ def api_call_time_windows(start, end, freq=90):
 #         # return zip(_all_timestamps[:-1],_all_timestamps[1:])
 #     return time_periods
 
+def datetime_formatter(value):
+    print "Value: {}/nTarget format: {}".format(value,target_format)
