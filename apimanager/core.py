@@ -7,8 +7,8 @@ import datetime
 import logging
 import time
 # import re.
-import urllib.urlencode
-import pytz.utc
+import urllib
+import pytz
 from itertools import product
 import numpy as np
 import sys
@@ -24,24 +24,24 @@ Core functions to deal with API requests.
 class RequestManager(object):
 
     def _hopper_initial_fill(self):
-        if self._hopper_params:
-            raw_params = {'access_token': self.access_token,}
-            params = urllib.urlencode(raw_params)
-        else:
-            params = ""
+        # if self._hopper_params:
+        #     raw_params = {'access_token': self.access_token,}
+        #     params = urllib.urlencode(raw_params)
+        # else:
+        #     params = ""
         # @TODO - This handling params is hacky and needs to be changed.
-        if "?" in self.url_base:
-            params = str("&" + params)
-        else:
-            params = str("?" + params)
 
+        core_params = self._params
         if self.api_type == "stream":
             logging.debug("API type: {}".format(self.api_type))
-            self.hopper += [str(self.url_base.format(_id) + params) 
+            url_params = urllib.urlencode(core_params)
+            print url_params
+            self.hopper += [str(self.url_base.format(_id) + url_params) 
                 for _id in self.id_list]
         elif self.api_type == "single":
             logging.debug("API type: {}".format(self.api_type))
-            self.hopper += [self.url_base.format(_id) + params 
+            url_params = urllib.urlencode(core_params)
+            self.hopper += [self.url_base.format(_id) + url_params 
             for _id in self.id_list]
         elif self.api_type == "batch":
             logging.debug("API type: {}".format(self.api_type))
@@ -50,12 +50,13 @@ class RequestManager(object):
             time_windows = utils.api_call_time_windows(self.date_start, self.date_end)
             merged_combo = product(time_windows, self.id_list,)
             for combo in merged_combo:
-                params = {"access_token": self.access_token,
-                          "since":combo[0][0],
-                          "until":combo[0][1]}
-                params = urllib.urlencode(params)
+                additional_params = {"since":combo[0][0],
+                    "until":combo[0][1]}
+                combined_params = core_params.copy()
+                combined_params.update(additional_params)
+                url_params = urllib.urlencode(combined_params)
                 page_name = combo[1]
-                self.hopper += [self.url_base.format(page_name) + "?" + params]
+                self.hopper += [self.url_base.format(page_name) + "?" + url_params]
         else:
             raise Exception("Unknown api_type")
 
@@ -87,8 +88,8 @@ class RequestManager(object):
         return _next_url
 
 
-    def __init__(self, ids, url_base, access_token, api_type, date_start=None, 
-        date_end=None,hopper_params=True, pagination=None):
+    def __init__(self, ids, url_base, access_token, api_type, params, date_start=None, 
+        date_end=None,hopper_params=True, pagination=None,):
         
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
@@ -123,6 +124,7 @@ class RequestManager(object):
         else:
             self.api_type = api_type
 
+        self._params = params
         self._pagination = pagination
 
         self._hopper_params = hopper_params
