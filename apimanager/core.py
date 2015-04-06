@@ -6,22 +6,13 @@ import json
 import datetime
 import logging
 import time
-import re
-import urlparse
-import urllib
-import pytz
-import itertools
-from functools import partial
-
+# import re.
+import urllib.urlencode
+import pytz.utc
+from itertools import product
 import numpy as np
-
 import sys
-
 import utils
-# from .utils import format_batch_item
-# from .utils import split_series_into_batches
-# from .utils import batch_id_requests, extract_data_from_single_batch_response,
-# error_checker, response_parser
 
 """
 apimanager.core
@@ -42,15 +33,12 @@ class RequestManager(object):
         if "?" in self.url_base:
             params = str("&" + params)
         else:
-            print False
             params = str("?" + params)
 
         if self.api_type == "stream":
             logging.debug("API type: {}".format(self.api_type))
-            print "Params: {}".format(params)
-            print "URL Base: {}".format(self.url_base)
             self.hopper += [str(self.url_base.format(_id) + params) 
-            for _id in self.id_list]
+                for _id in self.id_list]
         elif self.api_type == "single":
             logging.debug("API type: {}".format(self.api_type))
             self.hopper += [self.url_base.format(_id) + params 
@@ -60,7 +48,7 @@ class RequestManager(object):
 
             response_list = list()
             time_windows = utils.api_call_time_windows(self.date_start, self.date_end)
-            merged_combo = itertools.product(time_windows, self.id_list,)
+            merged_combo = product(time_windows, self.id_list,)
             for combo in merged_combo:
                 params = {"access_token": self.access_token,
                           "since":combo[0][0],
@@ -73,56 +61,25 @@ class RequestManager(object):
 
         logging.debug("Initial hopper fill complete")
 
-    def convert_stopper_time(self, stopper):
-        print "Let's begin"
-        print stopper
-        if type(stopper) is not list:
-            stopper = [stopper,]
-        print stopper
-        _paging_func, _paging_args = self._pagination["formatter"]
-        result = _paging_func(stopper,_paging_args)
-        print result
-        return result
-#        _formatter = partial(_paging_func, _paging_args)
-
-
     def manage_paging(self, response):
-        return_url = False
-        # print type(response)
-        # print response.keys()
+        _next_url = False
         _end_goal = self._pagination["end_goal"]
-        # print _end_goal
+        logging.debug("End goal: {}".format(_end_goal))
         _loc_to_check_against_goal = self._pagination["path"]
-        # print _loc_to_check_against_goal
-        
+
         try:
-            print self._pagination
             _stopper = reduce(lambda x,y: x[y], _loc_to_check_against_goal, response)
         except:
             raise Exception("Couldn't match the stopper location")
 
-        print "Got here"
-        print _stopper
-
-        print "La di da"
-
-        _final_stopper = datetime_formatter(_stopper)
-        print _final_stopper
-        # try:
-        #     print "About to process stopper"
-        #     _final_stopper = convert_stopper_time(_stopper)
-        #     print _final_stopper
-        # except:
-        #     raise Exception("Couldn't format the stopper")
-
-
+        logging.debug("Stopper: {}".format(_stopper))
+        _final_stopper = utils.datetime_formatter(_stopper)
+        logging.debug("Converted stopper: {}".format(_final_stopper))
         _next_url_loc = self._pagination["pagination_scheme"]
-        # latest_post_time > pd.to_datetime(self.date_end):
-        print _end_goal
         if _final_stopper > _end_goal:
-            print "Progress"
             try:
                 _next_url = reduce(lambda x, y: x[y], _next_url_loc, response)
+                logging.info("Paging check positive. Passing next URL.")
             except:
                 raise Exception("Path to next URL wasn't right")
         else:
@@ -145,7 +102,6 @@ class RequestManager(object):
             raise TypeError("IDs are not a valid list or string.")
 
         # Set the URL base provided in setup for this RequestManager instance
-
         self.url_base = None
         if isinstance(url_base, str):
             self.url_base = url_base
@@ -202,8 +158,6 @@ class RequestManager(object):
             _request_made = _request_made.replace(tzinfo=pytz.utc)
             logging.debug("Request sent timestamp: {}".format(_request_made))
             response = requests.get(_current_request)
-#            response.encoding = "latin-1"
-#            encoded = response.content#.encode("utf-8")
             _json_response = json.loads(response.content)
             _json_response["request_made"] = _request_made
             if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
@@ -213,10 +167,8 @@ class RequestManager(object):
                     _individual_results[counter]["_request_made"] = _request_made
                 _response_list += _individual_results
             elif response.status_code == 200 and not _json_response.get("error") and all(k in _json_response.keys() for k in ["created_time",]):
-                # @FIXME - hack to get Facebook likes/comments/shares quickly
+                # @TODO - hack to get Facebook likes/comments/shares quickly
                 _individual_results = _json_response
-                for counter, i in enumerate(_individual_results):
-                    _individual_results[counter]["_request_made"] = _request_made
                 _response_list.append(_individual_results)
             elif response.status_code == 200 and _json_response.get("error"):
                 _error_message = "Error: {msg}".format(msg=_json_item["error"]) 

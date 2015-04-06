@@ -2,6 +2,7 @@ import numpy as np
 import json
 import logging
 import pandas as pd
+import datetime# import datetime.fromtimestamp as fromtimestamp
 
 def split_series_into_batches(series):
     array_segment = np.array(series)
@@ -58,14 +59,14 @@ def error_checker(response):
     return _return_value
 
 def api_call_time_windows(start, end, freq=90):
-    _start = pd.to_datetime(start)
-    _end = pd.to_datetime(end)
-    range_with_intervals = pd.date_range(start=_start, end=_end, freq=(freq * pd.datetools.day))
+    _latest_date = pd.to_datetime(start)
+    _earliest_date = pd.to_datetime(end)
+    # TODO - need to change 'start' and 'end', it conflicts here/
+    range_with_intervals = pd.date_range(start=_earliest_date, end=_latest_date, freq=(freq * pd.datetools.day))
     converted_to_list = range_with_intervals.to_pydatetime().tolist()
-    if converted_to_list[-1] < _end:
-        converted_to_list.append(_end.to_pydatetime())
+    if converted_to_list[-1] < _earliest_date:
+        converted_to_list.append(_earliest_date.to_pydatetime())
     dates_as_integer = pd.Series(converted_to_list).astype(int) // 10**9
-    print dates_as_integer
     return zip(dates_as_integer[:-1],dates_as_integer[1:])
 
 #     _start_timestamp, _end_timestamp = pd.to_datetime((_start,_end))
@@ -86,4 +87,13 @@ def api_call_time_windows(start, end, freq=90):
 #     return time_periods
 
 def datetime_formatter(value):
-    print "Value: {}/nTarget format: {}".format(value,target_format)
+    if type(value) == unicode and len(value) == 10 and ":" not in value:
+        logging.debug('Detected as Instagram unix timestamp.')
+        _converted = float(value)
+        _converted = pd.to_datetime(_converted,unit="s")
+    elif type(value) == unicode and len(value) == 24 and ":" in value:
+        logging.debug('Detected as Facebook timestamp.')
+        _converted = pd.to_datetime(value)
+    else:
+        raise Exception("Unknown dateformat.")
+    return _converted
