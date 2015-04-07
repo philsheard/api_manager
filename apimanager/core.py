@@ -36,12 +36,12 @@ class RequestManager(object):
             logging.debug("API type: {}".format(self.api_type))
             url_params = urllib.urlencode(core_params)
             print url_params
-            self.hopper += [str(self.url_base.format(_id) + url_params) 
+            self.hopper += [str(self.url_base.format(_id) + "?" + url_params) 
                 for _id in self.id_list]
         elif self.api_type == "single":
             logging.debug("API type: {}".format(self.api_type))
             url_params = urllib.urlencode(core_params)
-            self.hopper += [self.url_base.format(_id) + url_params 
+            self.hopper += [self.url_base.format(_id) + "?" + url_params 
             for _id in self.id_list]
         elif self.api_type == "batch":
             logging.debug("API type: {}".format(self.api_type))

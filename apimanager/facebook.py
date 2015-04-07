@@ -3,6 +3,8 @@
 from .core import RequestManager
 import pandas as pd
 
+pagination_scheme = ('paging','next')
+
 
 def create_manager():
     '''Facebook API interfaces'''
@@ -70,3 +72,15 @@ def interactions(ids, access_token):
         access_token=access_token, api_type=_api_type,
         pagination=False, params=params)
     return manager
+
+def insights_post_unique_impressions(ids, access_token):
+    url_base = "https://graph.facebook.com/v2.2/{}/insights/post_impressions_unique"
+    _api_type = "single"
+    params = {"access_token": access_token,}
+    manager = RequestManager(ids=ids, url_base=url_base, 
+        access_token=access_token, api_type=_api_type,
+        pagination=False, params=params)
+    return manager
+
+
+
