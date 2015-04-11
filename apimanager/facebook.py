@@ -2,6 +2,13 @@
 
 from .core import RequestManager
 import pandas as pd
+from collections import defaultdict
+import datetime
+import urllib
+import sys
+from . import utils
+from itertools import product
+
 
 pagination_scheme = ('paging','next')
 
@@ -38,11 +45,33 @@ def insights_fans(ids, access_token, date_start=None, date_end=None,):
 def insights_impressions_unique(ids, access_token, date_start=None, date_end=None,period="day"):
     if period not in ["day","week","days_28"]:
         raise ValueError("Period must be either 'day','week' or 'days_28'")
+    
+    if date_end == None:
+        datetime.utcnow().replace(tzinfo = pytz.utc)
+    if date_start == None:
+        datetime.utcnow().replace(tzinfo = pytz.utc) - datetime.timedelta(days=-7)
+
+
     url_base = "https://graph.facebook.com/v2.2/{}/insights/page_impressions_unique"
     _api_type = "batch"
-    print access_token
-    params = {"access_token": access_token,
+    base_params = {"access_token": access_token,
                 "period": "day"}
+    
+    _date_windows = utils.api_call_time_windows(date_start, date_end,freq=7)
+    date_params = ({'since': x[0],'until':x[1]} for x in _date_windows)
+
+    params = defaultdict(set)  # uses set to avoid duplicates    
+    print base_params
+    print date_params
+    for i in product((base_params,), date_params):
+        # print list(d)
+        for d in i:    
+            for k, v in d.iteritems():
+                params[k].add(v)
+    print dict(params)
+    sys.exit()
+    #BUILD URLS HERE
+
     manager = RequestManager(ids=ids, url_base=url_base,
         date_start=date_start, date_end=date_end,
         access_token=access_token, api_type=_api_type,

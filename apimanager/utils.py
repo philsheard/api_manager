@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import datetime# import datetime.fromtimestamp as fromtimestamp
 
+
 def split_series_into_batches(series):
     array_segment = np.array(series)
     number_of_segments = array_segment.shape[0]/25
@@ -59,8 +60,8 @@ def error_checker(response):
     return _return_value
 
 def api_call_time_windows(start, end, freq=90):
-    _latest_date = pd.to_datetime(start)
-    _earliest_date = pd.to_datetime(end)
+    _latest_date = pd.to_datetime(end)
+    _earliest_date = pd.to_datetime(start)
     # TODO - need to change 'start' and 'end', it conflicts here/
     range_with_intervals = pd.date_range(start=_earliest_date, end=_latest_date, freq=(freq * pd.datetools.day))
     converted_to_list = range_with_intervals.to_pydatetime().tolist()
