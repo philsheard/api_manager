@@ -21,6 +21,7 @@ apimanager.core
 Core functions to deal with API requests.
 """
 
+
 class RequestManager(object):
 
     def _hopper_initial_fill(self):
@@ -36,22 +37,25 @@ class RequestManager(object):
             logging.debug("API type: {}".format(self.api_type))
             url_params = urllib.urlencode(core_params)
             print url_params
-            self.hopper += [str(self.url_base.format(_id) + "?" + url_params) 
-                for _id in self.id_list]
+            self.hopper += [str(self.url_base.format(_id) + "?" + url_params)
+                            for _id in self.id_list]
+
         elif self.api_type == "single":
             logging.debug("API type: {}".format(self.api_type))
             url_params = urllib.urlencode(core_params)
-            self.hopper += [self.url_base.format(_id) + "?" + url_params 
-            for _id in self.id_list]
+            self.hopper += [self.url_base.format(_id) + "?" + url_params
+                            for _id in self.id_list]
+
         elif self.api_type == "batch":
             logging.debug("API type: {}".format(self.api_type))
 
-            response_list = list()
-            time_windows = utils.api_call_time_windows(self.date_start, self.date_end)
+            # response_list = list()
+            time_windows = utils.api_call_time_windows(self.date_start,
+                                                       self.date_end)
             merged_combo = product(time_windows, self.id_list,)
             for combo in merged_combo:
-                additional_params = {"since":combo[0][0],
-                    "until":combo[0][1]}
+                additional_params = {"since": combo[0][0],
+                                     "until": combo[0][1]}
                 combined_params = core_params.copy()
                 combined_params.update(additional_params)
                 url_params = urllib.urlencode(combined_params)
@@ -69,7 +73,8 @@ class RequestManager(object):
         _loc_to_check_against_goal = self._pagination["path"]
 
         try:
-            _stopper = reduce(lambda x,y: x[y], _loc_to_check_against_goal, response)
+            _stopper = reduce(lambda x, y: x[y],
+                              _loc_to_check_against_goal, response)
         except:
             raise Exception("Couldn't match the stopper location")
 
@@ -87,16 +92,15 @@ class RequestManager(object):
             _next_url = False
         return _next_url
 
-
-    def __init__(self, ids, url_base, access_token, api_type, params, date_start=None, 
-        date_end=None,hopper_params=True, pagination=None,):
-        
+    def __init__(self, ids, url_base, access_token, api_type, params,
+                 date_start=None, date_end=None, hopper_params=True,
+                 pagination=None):
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
-        if isinstance(ids,str):
+        if isinstance(ids, str):
             self.id_list = [ids,]
             self.batch = False
-        elif isinstance(ids,list):
+        elif isinstance(ids, list):
             self.id_list = ids
             self.batch = True
         else:
@@ -108,7 +112,7 @@ class RequestManager(object):
             self.url_base = url_base
         else:
             raise TypeError("url_base provided is not a string")
-        
+
         if date_start:
             self.date_start = date_start
 
@@ -119,7 +123,7 @@ class RequestManager(object):
 
         self.access_token = access_token
 
-        if api_type not in ["stream", "single", "batch",]:
+        if api_type not in ["stream", "single", "batch"]:
             raise Exception("Invalid API type.")
         else:
             self.api_type = api_type
@@ -138,11 +142,11 @@ class RequestManager(object):
         # - Better handling of OAuth and delays
         # - Start using "error_checker" like we had in the previous version below
 
-        ''' 
-        Handles running of the actual requests to get data. Initial hopper of 
+        '''
+        Handles running of the actual requests to get data. Initial hopper of
         URLs to request is created at initialisation, based on the API type
-        called and the options provided. This method makes the requests and 
-        feeds them back. 
+        called and the options provided. This method makes the requests and
+        feeds them back.
 
         The only complex thing it needs to do is to know when to stop. This is
         mainly based on a date range (especially for feeds) but other reasons
@@ -173,8 +177,8 @@ class RequestManager(object):
                 _individual_results = _json_response
                 _response_list.append(_individual_results)
             elif response.status_code == 200 and _json_response.get("error"):
-                _error_message = "Error: {msg}".format(msg=_json_item["error"]) 
-                raise Exception(_error_message)
+                _error_msg = "Error: {msg}".format(msg=_json_response["error"])
+                raise Exception(_error_msg)
 
             ### NEED TO WORK TO INTEGRATE THIS CONCEPT
             # elif response.status_code == 400 and json.loads(
@@ -199,7 +203,6 @@ class RequestManager(object):
                     self.hopper.append(next_url_check)
 
         return _response_list
-
 
     def old_run(self):
         _master_response_list = list()

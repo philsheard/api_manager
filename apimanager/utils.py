@@ -2,7 +2,7 @@ import numpy as np
 import json
 import logging
 import pandas as pd
-import datetime# import datetime.fromtimestamp as fromtimestamp
+import datetime  # import datetime.fromtimestamp as fromtimestamp
 
 
 def split_series_into_batches(series):
@@ -11,7 +11,8 @@ def split_series_into_batches(series):
     batched_arrays = np.array_split(array_segment, number_of_segments)
     return batched_arrays
 
-def extract_data_from_single_batch_response(response,as_type='dict'):
+
+def extract_data_from_single_batch_response(response, as_type='dict'):
     # @TODO - MAKE THIS FLEXIBLE TO TAKE DYNAMIC FIELDS
     import pandas as pd
     current_response = json.loads(response["body"])
@@ -38,6 +39,7 @@ def extract_data_from_single_batch_response(response,as_type='dict'):
     else:
         return results
 
+
 def error_checker(response):
     _return_value = "ERROR" # Default option 
     _response_dict = json.loads(response.content)
@@ -58,6 +60,7 @@ def error_checker(response):
        raise Exception('Some sort of unknown error took place. Investigate.')
 
     return _return_value
+
 
 def api_call_time_windows(start, end, freq=90):
     _latest_date = pd.to_datetime(end)
@@ -86,6 +89,7 @@ def api_call_time_windows(start, end, freq=90):
 #         # _all_timestamps = _all_timestamps.astype(int) // 10**9
 #         # return zip(_all_timestamps[:-1],_all_timestamps[1:])
 #     return time_periods
+
 
 def datetime_formatter(value):
     if type(value) == unicode and len(value) == 10 and ":" not in value:
