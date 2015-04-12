@@ -92,49 +92,25 @@ class RequestManager(object):
             _next_url = False
         return _next_url
 
-    def __init__(self, ids, url_base, access_token, api_type, params,
-                 date_start=None, date_end=None, hopper_params=True,
-                 pagination=None):
+    def __init__(self, urls, hopper_params=True, pagination=None):
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
-        if isinstance(ids, str):
-            self.id_list = [ids,]
-            self.batch = False
-        elif isinstance(ids, list):
-            self.id_list = ids
-            self.batch = True
-        else:
-            raise TypeError("IDs are not a valid list or string.")
+
+        # if isinstance(ids, str):
+        #     self.id_list = [ids,]
+        #     self.batch = False
+        # elif isinstance(ids, list):
+        #     self.id_list = ids
+        #     self.batch = True
+        # else:
+        #     raise TypeError("IDs are not a valid list or string.")
 
         # Set the URL base provided in setup for this RequestManager instance
-        self.url_base = None
-        if isinstance(url_base, str):
-            self.url_base = url_base
-        else:
-            raise TypeError("url_base provided is not a string")
-
-        if date_start:
-            self.date_start = date_start
-
-        if date_end:
-            self.date_end = date_end
-        else:
-            self.date_end = None
-
-        self.access_token = access_token
-
-        if api_type not in ["stream", "single", "batch"]:
-            raise Exception("Invalid API type.")
-        else:
-            self.api_type = api_type
-
-        self._params = params
+        self._urls = urls
         self._pagination = pagination
-
         self._hopper_params = hopper_params
-
         self.hopper = list()
-        self._hopper_initial_fill()
+        self.hopper += self._urls
 
     def run(self):
         # @TODO:

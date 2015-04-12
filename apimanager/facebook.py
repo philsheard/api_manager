@@ -6,7 +6,9 @@ import datetime
 import sys
 from . import utils
 from itertools import product
+from itertools import chain
 import pytz
+import urllib
 
 
 pagination_scheme = ('paging', 'next')
@@ -50,38 +52,40 @@ def insights_impressions_unique(ids, access_token, date_start=None,
     if period not in ["day", "week", "days_28"]:
         raise ValueError("Period must be 'day','week' or 'days_28'")
 
+    # Build basic URLs
+    _api_domain = "https://graph.facebook.com"
+    _api_endpoint = "/v2.2/{}/insights/page_impressions_unique"
+    url_template = "{}{}".format(_api_domain, _api_endpoint)
+    
+    _formatted_urls = [url_template.format(_id) for _id in ids]
+
+    # Move on to paramaters
+    _base_params = [{"access_token": access_token,
+                    "period": period}, ]
+
+    # Build date periods
+    _utcnow = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
     if date_end is None:
-        datetime.utcnow().replace(tzinfo=pytz.utc)
-
+        date_end = _utcnow
     if date_start is None:
-        datetime.utcnow().replace(tzinfo= pytz.utc) - datetime.timedelta(days=-7)
-
-    url_base = \
-        "https://graph.facebook.com/v2.2/{}/insights/page_impressions_unique"
-    _api_type = "batch"
-    base_params = {"access_token": access_token,
-                   "period": "day"}
+        date_start = _utcnow - datetime.datetime.timedelta(days=-7)
     _date_windows = utils.api_call_time_windows(date_start, date_end, freq=7)
-    date_params = ({'since': x[0], 'until':x[1]} for x in _date_windows)
-    param_list = [base_params, date_params]
-    params = {}
+    _date_params = [{'since': x[0], 'until': x[1]} for x in _date_windows]
 
-    # print base_params
-    # print date_params
+    _combined_params = product(_base_params, _date_params)
 
-    for i in product(*param_list):
-        # print list(d)
+    list_of_params = list()
+    for i in _combined_params:
+        params = {}
         for d in i:
             for k, v in d.iteritems():
-                params[k].add(v)
-    print dict(params)
-    sys.exit()
-    # BUILD URLS HERE
+                params[k] = v
+        list_of_params.append(urllib.urlencode(params))
 
-    manager = RequestManager(ids=ids, url_base=url_base,
-                             date_start=date_start, date_end=date_end,
-                             access_token=access_token, api_type=_api_type,
-                             pagination=False, params=params)
+    _components = product(_formatted_urls, list_of_params)
+    _finalised_urls = ["{0}?{1}".format(_u, _p) for _u, _p in _components]
+
+    manager = RequestManager(urls=_finalised_urls, pagination=False)
     return manager
 
 
