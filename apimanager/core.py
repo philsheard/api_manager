@@ -10,8 +10,6 @@ import time
 import urllib
 import pytz
 from itertools import product
-import numpy as np
-import sys
 import utils
 
 """
@@ -92,7 +90,7 @@ class RequestManager(object):
             _next_url = False
         return _next_url
 
-    def __init__(self, urls, hopper_params=True, pagination=None):
+    def __init__(self, urls=None, hopper_params=True, pagination=None):
         # Check whether ids contains a string or list. 
         # If it's a string, create a list of one for consistency
 
@@ -106,17 +104,36 @@ class RequestManager(object):
         #     raise TypeError("IDs are not a valid list or string.")
 
         # Set the URL base provided in setup for this RequestManager instance
-        self._urls = urls
-        self._pagination = pagination
-        self._hopper_params = hopper_params
+
         self.hopper = list()
-        self.hopper += self._urls
+
+        if urls:
+            self._urls = urls
+            self.hopper += self._urls
+        if pagination:
+            self._pagination = pagination
+        if hopper_params:
+            self._hopper_params = hopper_params
+
+    def from_product(self, base_urls, *param_groups):
+        _combined_params = product(*param_groups)
+        list_of_params = []
+        for combined_param_product in _combined_params:
+            params = {}
+            for param_dict in combined_param_product:
+                params.update(param_dict)
+            list_of_params.append(urllib.urlencode(params))
+        components = product(base_urls, list_of_params)
+        finalised_urls = ["{0}?{1}".format(_u, _p) for _u, _p in components]
+        self.hopper += finalised_urls
+        return self
 
     def run(self):
         # @TODO:
         # - Ability to return in different formats (raw, pandas, dict, etc)
         # - Better handling of OAuth and delays
-        # - Start using "error_checker" like we had in the previous version below
+        # - Start using "error_checker" like we had in
+        #   the previous version below
 
         '''
         Handles running of the actual requests to get data. Initial hopper of
