@@ -96,14 +96,21 @@ def api_call_time_windows(start=None, end=None, freq=90,
     return zip(final_date_ranges[:-1], final_date_ranges[1:])
 
 
-def datetime_formatter(value):
-    if type(value) == unicode and len(value) == 10 and ":" not in value:
-        logging.debug('Detected as Instagram unix timestamp.')
-        _converted = float(value)
-        _converted = pd.to_datetime(_converted, unit="s")
-    elif type(value) == unicode and len(value) == 24 and ":" in value:
-        logging.debug('Detected as Facebook timestamp.')
-        _converted = pd.to_datetime(value)
+def datetime_formatter(value=None):
+    if value:
+        print value
+        if type(value) == unicode and len(value) == 10 and ":" not in value:
+            logging.debug('Detected as Instagram unix timestamp.')
+            _converted = float(value)
+            _converted = pd.to_datetime(_converted, unit="s")
+        elif type(value) == unicode and len(value) == 24 and ":" in value:
+            logging.debug('Detected as Facebook timestamp.')
+            _converted = pd.to_datetime(value)
+        else:
+            logging.debug("Value: {}/n\
+                           Type: {}/n\
+                           Length: {}".format(value, type(value), len(value)))
+            raise Exception("Unknown dateformat.")
+        return _converted
     else:
-        raise Exception("Unknown dateformat.")
-    return _converted
+        raise Exception("No value provided")

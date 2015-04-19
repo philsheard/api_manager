@@ -2,13 +2,8 @@
 
 from .core import RequestManager
 import pandas as pd
-import datetime
-import sys
 from . import utils
-from itertools import product
-from itertools import chain
-import pytz
-import urllib
+from . import pagination
 
 
 pagination_scheme = ('paging', 'next')
@@ -21,18 +16,49 @@ def create_manager():
 
 
 def feed(ids, access_token, date_end=None,):
-    url_base = "https://graph.facebook.com/v2.2/{}/feed"
-    _api_type = "stream"
-    pagination = {'pagination_scheme': pagination_scheme,
-                  'path': ('data', -1, "created_time"),
-                  'end_goal': pd.to_datetime(date_end),
-                  'formatter': pd.to_datetime}
-    params = {"access_token": access_token}
-    manager = RequestManager(ids=ids, url_base=url_base,
-                             access_token=access_token, api_type=_api_type,
-                             date_end=date_end, pagination=pagination,
-                             params=params)
+    # url_base = "https://graph.facebook.com/v2.2/{}/feed"
+    # _api_type = "stream"
+    # params = {"access_token": access_token}
+    # manager = RequestManager(ids=ids, url_base=url_base,
+    #                          access_token=access_token, api_type=_api_type,
+    #                          date_end=date_end, pagination=pagination,
+    #                          params=params)
+    # return manager
+
+    _api_domain = "https://graph.facebook.com"
+    _api_endpoint = "/v2.2/{}/feed"
+    url_template = "{}{}".format(_api_domain, _api_endpoint)
+
+    # Build basic URLs
+    _formatted_urls = (url_template.format(_id) for _id in ids)
+
+    # Move on to paramaters
+    _base_params = [{"access_token": access_token}]
+
+    # Handle Pagination
+    pagination_dict = {
+#                       'pagination_scheme': pagination_scheme,
+                       'target_path': ('data', -1, "created_time"),
+                       'stop_val': pd.to_datetime(date_end),
+                       # 'formatter': pd.to_datetime
+                       }
+
+    # Create the RequestManager instance
+    manager = RequestManager()
+    # Now pass the paramaters and base URLs to fill the hopper.
+    manager.from_product(_formatted_urls, _base_params)
+
+    # Pagination
+    # @TODO - the idea was to use a pagination func that takes the response
+    # as an argument - however, it's a separate function and can't know about
+    # it yet. One option is to pass the function and paramaters separately
+    # and then compile the function when the thing gets run. Could use 
+    # 'partial' or something. Idea was to use `.map()` to apply the function.
+    manager.set_pagination(func=pagination.end_date, params=pagination_dict)
+
     return manager
+
+
 
 
 def insights_fans(ids, access_token, date_start=None, date_end=None,):

@@ -6,11 +6,11 @@ import json
 import datetime
 import logging
 import time
-# import re.
 import urllib
 import pytz
 from itertools import product
 import utils
+from functools import partial
 
 """
 apimanager.core
@@ -21,48 +21,6 @@ Core functions to deal with API requests.
 
 
 class RequestManager(object):
-
-    def _hopper_initial_fill(self):
-        # if self._hopper_params:
-        #     raw_params = {'access_token': self.access_token,}
-        #     params = urllib.urlencode(raw_params)
-        # else:
-        #     params = ""
-        # @TODO - This handling params is hacky and needs to be changed.
-
-        core_params = self._params
-        if self.api_type == "stream":
-            logging.debug("API type: {}".format(self.api_type))
-            url_params = urllib.urlencode(core_params)
-            print url_params
-            self.hopper += [str(self.url_base.format(_id) + "?" + url_params)
-                            for _id in self.id_list]
-
-        elif self.api_type == "single":
-            logging.debug("API type: {}".format(self.api_type))
-            url_params = urllib.urlencode(core_params)
-            self.hopper += [self.url_base.format(_id) + "?" + url_params
-                            for _id in self.id_list]
-
-        elif self.api_type == "batch":
-            logging.debug("API type: {}".format(self.api_type))
-
-            # response_list = list()
-            time_windows = utils.api_call_time_windows(self.date_start,
-                                                       self.date_end)
-            merged_combo = product(time_windows, self.id_list,)
-            for combo in merged_combo:
-                additional_params = {"since": combo[0][0],
-                                     "until": combo[0][1]}
-                combined_params = core_params.copy()
-                combined_params.update(additional_params)
-                url_params = urllib.urlencode(combined_params)
-                page_name = combo[1]
-                self.hopper += [self.url_base.format(page_name) + "?" + url_params]
-        else:
-            raise Exception("Unknown api_type")
-
-        logging.debug("Initial hopper fill complete")
 
     def manage_paging(self, response):
         _next_url = False
@@ -91,20 +49,6 @@ class RequestManager(object):
         return _next_url
 
     def __init__(self, urls=None, hopper_params=True, pagination=None):
-        # Check whether ids contains a string or list. 
-        # If it's a string, create a list of one for consistency
-
-        # if isinstance(ids, str):
-        #     self.id_list = [ids,]
-        #     self.batch = False
-        # elif isinstance(ids, list):
-        #     self.id_list = ids
-        #     self.batch = True
-        # else:
-        #     raise TypeError("IDs are not a valid list or string.")
-
-        # Set the URL base provided in setup for this RequestManager instance
-
         self.hopper = list()
 
         if urls:
@@ -116,6 +60,13 @@ class RequestManager(object):
             self._hopper_params = hopper_params
 
     def from_product(self, base_urls, *param_groups):
+        '''Create a batch of URLs from the product of passed iterables.
+
+        :type base_urls: list[str]
+        :type param_groups: tuple[list[dict[str]]]
+        :rtype: RequestManager instance with URLs added to hopper.
+
+        '''
         _combined_params = product(*param_groups)
         list_of_params = []
         for combined_param_product in _combined_params:
@@ -128,27 +79,21 @@ class RequestManager(object):
         self.hopper += finalised_urls
         return self
 
+    def set_pagination(self, **kwargs):
+        '''Assign pagination variables to RequestManager object.'''
+        self.pagination_func = partial(self._pagination["func"], **self._pagination["params"])
+        self._pagination = {}
+        self._pagination["func"] = kwargs["func"]
+        self._pagination["params"] = kwargs["params"]
+
     def run(self):
+        '''Make a series of requests from the hopper and handle pagination.'''
         # @TODO:
         # - Ability to return in different formats (raw, pandas, dict, etc)
         # - Better handling of OAuth and delays
         # - Start using "error_checker" like we had in
         #   the previous version below
-
-        '''
-        Handles running of the actual requests to get data. Initial hopper of
-        URLs to request is created at initialisation, based on the API type
-        called and the options provided. This method makes the requests and
-        feeds them back.
-
-        The only complex thing it needs to do is to know when to stop. This is
-        mainly based on a date range (especially for feeds) but other reasons
-        could be added in future.
-        '''
-        if self.date_end:
-            _date_end = pd.to_datetime(self.date_end)
-        else:
-            _date_end = datetime.datetime.now()
+        
         _response_list = list()
         while self.hopper:
             logging.debug("Entering an iteration of the loop")
@@ -172,7 +117,6 @@ class RequestManager(object):
             elif response.status_code == 200 and _json_response.get("error"):
                 _error_msg = "Error: {msg}".format(msg=_json_response["error"])
                 raise Exception(_error_msg)
-
             ### NEED TO WORK TO INTEGRATE THIS CONCEPT
             # elif response.status_code == 400 and json.loads(
             #         _json_response["body"])["error"]["code"] == 613:
@@ -187,11 +131,11 @@ class RequestManager(object):
             elif response.status_code == 404 and _json_response.get("error"):
                 raise Exception(_json_response["error"])
             else:
-                print response.status_code
                 raise Exception("Unknown error/nCode: {}/n Response:{}".format(response.status_code,response.content))
 
             if self._pagination:
-                next_url_check = self.manage_paging(_json_response)
+                next_url_check = self.pagination_func(_json_response)
+                logging.debug("Next url: {}".format(next_url_check))
                 if next_url_check:
                     self.hopper.append(next_url_check)
 
