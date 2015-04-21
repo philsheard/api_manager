@@ -2,7 +2,6 @@
 
 import logging
 from . import utils
-import sys
 
 # From the Pandas docs:
 '''formatters:
@@ -24,17 +23,17 @@ def end_date(response, target_path, stop_val):  # check_method=">="
     logging.debug("End goal: {}".format(stop_val))
     try:
         stopper = reduce(lambda x, y: x[y],
-                          target_path, response)
+                         target_path, response)
     except:
         raise Exception("Couldn't match the stopper location")
     logging.debug("Stopper: {}".format(stopper))
     stopper_dt = utils.datetime_formatter(stopper)
-    if type(stop_val) in [str,unicode]:
+    if type(stop_val) in [str, unicode]:
         stop_val_dt = utils.datetime_formatter(stop_val)
     else:
         stop_val_dt = stop_val
     logging.debug("Converted stopper: {}".format(stopper_dt))
-    if stopper_dt > stop_val:
+    if stopper_dt > stop_val_dt:
         try:
             pagination_scheme = ('paging', 'next')
             next_url = reduce(lambda x, y: x[y], pagination_scheme, response)
