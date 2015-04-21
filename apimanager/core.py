@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import pandas as pd
 import requests
 import json
 import datetime
 import logging
-import time
 import urllib
 import pytz
 from itertools import product
@@ -81,7 +79,8 @@ class RequestManager(object):
 
     def set_pagination(self, **kwargs):
         '''Assign pagination variables to RequestManager object.'''
-        self.pagination_func = partial(self._pagination["func"], **self._pagination["params"])
+        self.pagination_func = partial(self._pagination["func"],
+                                       **self._pagination["params"])
         self._pagination = {}
         self._pagination["func"] = kwargs["func"]
         self._pagination["params"] = kwargs["params"]
@@ -93,33 +92,43 @@ class RequestManager(object):
         # - Better handling of OAuth and delays
         # - Start using "error_checker" like we had in
         #   the previous version below
-        
+
         _response_list = list()
         while self.hopper:
             logging.debug("Entering an iteration of the loop")
             _current_request = self.hopper.pop()
-            _request_made = datetime.datetime.utcnow()
-            _request_made = _request_made.replace(tzinfo=pytz.utc)
-            logging.debug("Request sent timestamp: {}".format(_request_made))
+            request_made = datetime.datetime.utcnow()
+            request_made = request_made.replace(tzinfo=pytz.utc)
+            logging.debug("Request sent timestamp: {}".format(request_made))
             response = requests.get(_current_request)
-            _json_response = json.loads(response.content)
-            _json_response["request_made"] = _request_made
-            if response.status_code == 200 and not _json_response.get("error") and "data" in _json_response:
+            json_response = json.loads(response.content)
+            json_response["request_made"] = request_made
+
+            if (response.status_code == 200
+                    and not json_response.get("error")
+                    and "data" in json_response):
+
                 # @TODO - this is very FB specific, so need to adapt later
-                _individual_results = _json_response["data"]
+                _individual_results = json_response["data"]
                 for counter, i in enumerate(_individual_results):
-                    _individual_results[counter]["_request_made"] = _request_made
+                    _individual_results[counter]["request_made"] = request_made
                 _response_list += _individual_results
-            elif response.status_code == 200 and not _json_response.get("error") and all(k in _json_response.keys() for k in ["created_time",]):
+
+            elif (response.status_code == 200
+                  and not json_response.get("error")
+                  and all(k in json_response.keys()
+                          for k in ["created_time", ])):
+
                 # @TODO - hack to get Facebook likes/comments/shares quickly
-                _individual_results = _json_response
+                _individual_results = json_response
                 _response_list.append(_individual_results)
-            elif response.status_code == 200 and _json_response.get("error"):
-                _error_msg = "Error: {msg}".format(msg=_json_response["error"])
+
+            elif response.status_code == 200 and json_response.get("error"):
+                _error_msg = "Error: {msg}".format(msg=json_response["error"])
                 raise Exception(_error_msg)
-            ### NEED TO WORK TO INTEGRATE THIS CONCEPT
+            # NEED TO WORK TO INTEGRATE THIS CONCEPT
             # elif response.status_code == 400 and json.loads(
-            #         _json_response["body"])["error"]["code"] == 613:
+            #         json_response["body"])["error"]["code"] == 613:
             #     delay_time = 120
             #     logging.info("API limit exceeded. Waiting for %s seconds" % (
             #         delay_time))
@@ -128,50 +137,17 @@ class RequestManager(object):
             #     raise Exception(json.loads(response.content))
             elif response.status_code == 400:
                 raise Exception(json.loads(response.content))
-            elif response.status_code == 404 and _json_response.get("error"):
-                raise Exception(_json_response["error"])
+            elif response.status_code == 404 and json_response.get("error"):
+                raise Exception(json_response["error"])
             else:
-                raise Exception("Unknown error/nCode: {}/n Response:{}".format(response.status_code,response.content))
+                exception_string = "Unknown error/nCode: {}/n Response:{}"
+                raise Exception(exception_string.format(response.status_code,
+                                                        response.content))
 
             if self._pagination:
-                next_url_check = self.pagination_func(_json_response)
+                next_url_check = self.pagination_func(json_response)
                 logging.debug("Next url: {}".format(next_url_check))
                 if next_url_check:
                     self.hopper.append(next_url_check)
 
         return _response_list
-
-    def old_run(self):
-        _master_response_list = list()
-
-        for _single_id in self.id_list:
-            _string_url = str(self.url_base)
-            _prepared_url = _string_url.format(page_id=_single_id,
-                access_token=self.access_token)
-            _created_datetime = datetime.now() # Start from now
-            while _created_datetime > pd.to_datetime(self.date_end):
-                response = requests.get(_prepared_url)
-                logging.debug("Response successful")
-                _response_check = error_checker(response)
-                if _response_check == "VALID":
-                    _response_dict = json.loads(response.content)
-                    _master_response_list = _master_response_list + _response_dict["data"]
-                    _created_datetime = pd.to_datetime(
-                        _response_dict["data"][-1:][0]["created_time"])
-                    _prepared_url = json.loads(response.content)["paging"]["next"]
-                    logging.info("Successful response: {id} - {created_datetime} oldest".format(
-                        id=_single_id, created_datetime=_created_datetime))
-                elif _response_check == "VALID_EMPTY":
-                    _created_datetime = pd.to_datetime(self.date_end)
-                elif _response_check == "RATELIMIT":
-                    _wait_seconds = 120
-                    logging.info("Rate limit reached. Waiting for {seconds} seconds".format(
-                        seconds=_wait_seconds))
-                    time.wait(_wait_seconds)
-                elif _response_check == "ERROR":
-                    raise Exception("Unknown error check response.")
-                else:
-                    raise Exception("Unknown error check response.")
-            else:
-                logging.info("Loop finished for {id}".format(id=_single_id))
-        return _master_response_list

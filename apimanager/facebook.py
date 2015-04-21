@@ -37,10 +37,8 @@ def feed(ids, access_token, date_end=None,):
 
     # Handle Pagination
     pagination_dict = {
-#                       'pagination_scheme': pagination_scheme,
                        'target_path': ('data', -1, "created_time"),
                        'stop_val': pd.to_datetime(date_end),
-                       # 'formatter': pd.to_datetime
                        }
 
     # Create the RequestManager instance
@@ -52,13 +50,11 @@ def feed(ids, access_token, date_end=None,):
     # @TODO - the idea was to use a pagination func that takes the response
     # as an argument - however, it's a separate function and can't know about
     # it yet. One option is to pass the function and paramaters separately
-    # and then compile the function when the thing gets run. Could use 
+    # and then compile the function when the thing gets run. Could use
     # 'partial' or something. Idea was to use `.map()` to apply the function.
     manager.set_pagination(func=pagination.end_date, params=pagination_dict)
 
     return manager
-
-
 
 
 def insights_fans(ids, access_token, date_start=None, date_end=None,):
