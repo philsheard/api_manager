@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import datetime  # import datetime.fromtimestamp as fromtimestamp
 import pytz
+import time
 
 
 def split_series_into_batches(series):
@@ -46,25 +47,60 @@ def extract_data_from_single_batch_response(response, as_type='dict'):
 
 def error_checker(response):
     _return_value = "ERROR"  # Default option
-    _response_dict = json.loads(response.content)
     r_code = response.status_code
-    if r_code is 200 and _response_dict.get("data", None) is True:
+
+    if (r_code is 200 and "data" in response and "error" not in response):
         logging.debug("Response looks fine. Setting positive progress.")
-        _return_value = "VALID"
-    elif r_code is 200 and _response_dict.get("data", None) is False:
+        _return_value = "VALID_FB_FEED"
+    elif (r_code is 200 and "error" not in response
+          and all(k in response.keys() for k in ["created_time", ])):
+        _return_value = "VALID_FB_INTERACTIONS"
+    elif (r_code is 200 and response.get("data", None) is False):
         logging.debug("Valid response but no data. Typically end of records.")
         _return_value = "VALID_EMPTY"
-    elif r_code is 400 and _response_dict["body"]["error"]["code"] is 613:
-        # Rate limit error - recommend waiting
+    elif (r_code is 200 and "error" in response):
+        _return_value = "ERROR"
+    elif r_code is 400 and response["body"]["error"]["code"] is 613:
         _return_value = "RATELIMIT"
-    elif _response_dict.get("error", None):
-        # There was an error in the API from FB. This should be caught by the
-        # status code check for 200, but it's a backstop just in case.
-        raise Exception('Error. Could be innocent, like a rate limit error.')
+    elif r_code is 400:
+        _return_value = "ERROR"
     else:
         raise Exception('Unknown error. Investigate.')
 
     return _return_value
+
+
+def process_response(response):
+    response_check = error_checker(response)
+    if response_check == "VALID_FB_FEED":
+        individual_results = response["data"]
+        request_made = response["request_made"]
+        output = []
+        for counter, i in enumerate(individual_results):
+            individual_results[counter]["request_made"] = request_made
+            output += individual_results
+        result = "OK"
+    elif response_check == "VALID_FB_INTERACTIONS":
+        individual_results = response
+        result = "OK"
+        output = individual_results
+    elif response_check == "VALID_EMPTY":
+        result = "OK"
+        output = None
+    elif response_check == "RATELIMIT":
+        delay_time = 120
+        msg = "API limit exceeded. Waiting for {} seconds"
+        logging.info(msg.format(delay_time))
+        time.sleep(delay_time)
+        result = "RETRY"
+    elif response_check == "ERROR":
+        error_msg = "Error: {msg}".format(msg=response.content)
+        raise Exception(error_msg)
+    else:
+        exception_string = "Unknown error/nCode: {}/n Response:{}"
+        raise Exception(exception_string.format(response.status_code,
+                                                response.content))
+    return (result, output)
 
 
 def api_call_time_windows(start=None, end=None, freq=90,
