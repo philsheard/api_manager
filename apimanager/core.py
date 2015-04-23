@@ -79,18 +79,18 @@ class RequestManager(object):
 
     def set_pagination(self, **kwargs):
         '''Assign pagination variables to RequestManager object.'''
-        self.pagination_func = partial(self._pagination["func"],
-                                       **self._pagination["params"])
         self._pagination = {}
         self._pagination["func"] = kwargs["func"]
         self._pagination["params"] = kwargs["params"]
+        self.pagination_func = partial(self._pagination["func"],
+                                       **self._pagination["params"])
 
     def run(self):
         '''Make a series of requests from the hopper and handle pagination.'''
         # @TODO:
         # - Ability to return in different formats (raw, pandas, dict, etc)
 
-        _response_list = list()
+        response_list = list()
         while self.hopper:
             logging.debug("Entering an iteration of the loop")
 
@@ -101,19 +101,22 @@ class RequestManager(object):
             _current_request = self.hopper.pop()
             response = requests.get(_current_request)
 
-            json_response = json.loads(response.content)
-            json_response["request_made"] = request_made
+            # json_response = json.loads(response.content)
+            # json_response["request_made"] = request_made
 
-            result, output = utils.process_response(json_response)
+            result, output = utils.process_response(response,
+                                                    request_made)
             if result == "OK":
-                _response_list.extend(output)
+                response_list.extend(output)
             elif result == "RETRY":
                 self.hopper.append(response.url)
 
-            if self._pagination:
-                next_url_check = self.pagination_func(json_response)
+            if getattr(self, "_pagination", None):
+                response_dict = json.loads(response.content)
+                next_url_check = self.pagination_func(response_dict)
                 logging.debug("Next url: {}".format(next_url_check))
                 if next_url_check:
                     self.hopper.append(next_url_check)
 
-        return _response_list
+        self.result = response_list
+        return response_list

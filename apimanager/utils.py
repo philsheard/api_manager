@@ -46,42 +46,44 @@ def extract_data_from_single_batch_response(response, as_type='dict'):
 
 
 def error_checker(response):
-    _return_value = "ERROR"  # Default option
+    return_value = "ERROR"  # Default option
     r_code = response.status_code
-
-    if (r_code is 200 and "data" in response and "error" not in response):
+    response_dict = json.loads(response.content)
+    if (r_code is 200 and "data" in response_dict
+            and "error" not in response_dict):
         logging.debug("Response looks fine. Setting positive progress.")
-        _return_value = "VALID_FB_FEED"
-    elif (r_code is 200 and "error" not in response
-          and all(k in response.keys() for k in ["created_time", ])):
-        _return_value = "VALID_FB_INTERACTIONS"
-    elif (r_code is 200 and response.get("data", None) is False):
+        return_value = "VALID_FB_FEED"
+    elif (r_code is 200 and "error" not in response_dict
+          and all(k in response_dict.keys() for k in ["created_time", ])):
+        return_value = "VALID_FB_INTERACTIONS"
+    elif (r_code is 200 and response_dict.get("data", None) is False):
         logging.debug("Valid response but no data. Typically end of records.")
-        _return_value = "VALID_EMPTY"
-    elif (r_code is 200 and "error" in response):
-        _return_value = "ERROR"
-    elif r_code is 400 and response["body"]["error"]["code"] is 613:
-        _return_value = "RATELIMIT"
+        return_value = "VALID_EMPTY"
+    elif (r_code is 200 and "error" in response_dict):
+        return_value = "ERROR"
+    elif r_code is 400 and response_dict["body"]["error"]["code"] is 613:
+        return_value = "RATELIMIT"
     elif r_code is 400:
-        _return_value = "ERROR"
+        return_value = "ERROR"
     else:
+        print response_dict
         raise Exception('Unknown error. Investigate.')
+    logging.debug(return_value)
+    return return_value
 
-    return _return_value
 
-
-def process_response(response):
+def process_response(response, request_made):
     response_check = error_checker(response)
+    response_dict = json.loads(response.content)
     if response_check == "VALID_FB_FEED":
-        individual_results = response["data"]
-        request_made = response["request_made"]
+        individual_results = response_dict["data"]
         output = []
         for counter, i in enumerate(individual_results):
             individual_results[counter]["request_made"] = request_made
             output += individual_results
         result = "OK"
     elif response_check == "VALID_FB_INTERACTIONS":
-        individual_results = response
+        individual_results = response_dict
         result = "OK"
         output = individual_results
     elif response_check == "VALID_EMPTY":
