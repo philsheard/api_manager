@@ -4,29 +4,67 @@ import logging
 import pandas as pd
 import datetime
 import pytz
+import time
 
 
 def error_checker(response):
-    _return_value = "ERROR"  # Default option
-    _response_dict = json.loads(response.content)
+    return_value = "ERROR"  # Default option
     r_code = response.status_code
-    if r_code is 200 and _response_dict.get("data", None) is True:
+    response_dict = json.loads(response.content)
+    if (r_code is 200 and "data" in response_dict
+            and "error" not in response_dict):
         logging.debug("Response looks fine. Setting positive progress.")
-        _return_value = "VALID"
-    elif r_code is 200 and _response_dict.get("data", None) is False:
+        return_value = "VALID_FB_FEED"
+    elif (r_code is 200 and "error" not in response_dict
+          and all(k in response_dict.keys() for k in ["created_time", ])):
+        return_value = "VALID_FB_INTERACTIONS"
+    elif (r_code is 200 and response_dict.get("data", None) is False):
         logging.debug("Valid response but no data. Typically end of records.")
-        _return_value = "VALID_EMPTY"
-    elif r_code is 400 and _response_dict["body"]["error"]["code"] is 613:
-        # Rate limit error - recommend waiting
-        _return_value = "RATELIMIT"
-    elif _response_dict.get("error", None):
-        # Unspecified error
-        raise Exception('Error. If repeatable, add to detected errors.')
+        return_value = "VALID_EMPTY"
+    elif (r_code is 200 and "error" in response_dict):
+        return_value = "ERROR"
+    elif r_code is 400 and response_dict["body"]["error"]["code"] is 613:
+        return_value = "RATELIMIT"
+    elif r_code is 400:
+        return_value = "ERROR"
     else:
-        # Wildcard error capture
+        print response_dict
         raise Exception('Unknown error. Investigate.')
+    logging.debug(return_value)
+    return return_value
 
-    return _return_value
+
+def process_response(response, request_made):
+    response_check = error_checker(response)
+    response_dict = json.loads(response.content)
+    if response_check == "VALID_FB_FEED":
+        individual_results = response_dict["data"]
+        output = []
+        for counter, i in enumerate(individual_results):
+            individual_results[counter]["request_made"] = request_made
+            output += individual_results
+        result = "OK"
+    elif response_check == "VALID_FB_INTERACTIONS":
+        individual_results = response_dict
+        result = "OK"
+        output = individual_results
+    elif response_check == "VALID_EMPTY":
+        result = "OK"
+        output = None
+    elif response_check == "RATELIMIT":
+        delay_time = 120
+        msg = "API limit exceeded. Waiting for {} seconds"
+        logging.info(msg.format(delay_time))
+        time.sleep(delay_time)
+        result = "RETRY"
+    elif response_check == "ERROR":
+        error_msg = "Error: {msg}".format(msg=response.content)
+        raise Exception(error_msg)
+    else:
+        exception_string = "Unknown error/nCode: {}/n Response:{}"
+        raise Exception(exception_string.format(response.status_code,
+                                                response.content))
+    return (result, output)
 
 
 def api_call_time_windows(start=None, end=None, freq=90,

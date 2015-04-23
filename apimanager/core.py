@@ -79,75 +79,44 @@ class RequestManager(object):
 
     def set_pagination(self, **kwargs):
         '''Assign pagination variables to RequestManager object.'''
-        self.pagination_func = partial(self._pagination["func"],
-                                       **self._pagination["params"])
         self._pagination = {}
         self._pagination["func"] = kwargs["func"]
         self._pagination["params"] = kwargs["params"]
+        self.pagination_func = partial(self._pagination["func"],
+                                       **self._pagination["params"])
 
     def run(self):
         '''Make a series of requests from the hopper and handle pagination.'''
         # @TODO:
         # - Ability to return in different formats (raw, pandas, dict, etc)
-        # - Better handling of OAuth and delays
-        # - Start using "error_checker" like we had in
-        #   the previous version below
 
-        _response_list = list()
+        response_list = list()
         while self.hopper:
             logging.debug("Entering an iteration of the loop")
-            _current_request = self.hopper.pop()
+
             request_made = datetime.datetime.utcnow()
             request_made = request_made.replace(tzinfo=pytz.utc)
             logging.debug("Request sent timestamp: {}".format(request_made))
+
+            _current_request = self.hopper.pop()
             response = requests.get(_current_request)
-            json_response = json.loads(response.content)
-            json_response["request_made"] = request_made
 
-            if (response.status_code == 200
-                    and not json_response.get("error")
-                    and "data" in json_response):
+            # json_response = json.loads(response.content)
+            # json_response["request_made"] = request_made
 
-                # @TODO - this is very FB specific, so need to adapt later
-                _individual_results = json_response["data"]
-                for counter, i in enumerate(_individual_results):
-                    _individual_results[counter]["request_made"] = request_made
-                _response_list += _individual_results
+            result, output = utils.process_response(response,
+                                                    request_made)
+            if result == "OK":
+                response_list.extend(output)
+            elif result == "RETRY":
+                self.hopper.append(response.url)
 
-            elif (response.status_code == 200
-                  and not json_response.get("error")
-                  and all(k in json_response.keys()
-                          for k in ["created_time", ])):
-
-                # @TODO - hack to get Facebook likes/comments/shares quickly
-                _individual_results = json_response
-                _response_list.append(_individual_results)
-
-            elif response.status_code == 200 and json_response.get("error"):
-                _error_msg = "Error: {msg}".format(msg=json_response["error"])
-                raise Exception(_error_msg)
-            # NEED TO WORK TO INTEGRATE THIS CONCEPT
-            # elif response.status_code == 400 and json.loads(
-            #         json_response["body"])["error"]["code"] == 613:
-            #     delay_time = 120
-            #     logging.info("API limit exceeded. Waiting for %s seconds" % (
-            #         delay_time))
-            #     time.sleep(delay_time)
-            #     self.hopper.append(response.url)
-            #     raise Exception(json.loads(response.content))
-            elif response.status_code == 400:
-                raise Exception(json.loads(response.content))
-            elif response.status_code == 404 and json_response.get("error"):
-                raise Exception(json_response["error"])
-            else:
-                exception_string = "Unknown error/nCode: {}/n Response:{}"
-                raise Exception(exception_string.format(response.status_code,
-                                                        response.content))
-
-            if self._pagination:
-                next_url_check = self.pagination_func(json_response)
+            if getattr(self, "_pagination", None):
+                response_dict = json.loads(response.content)
+                next_url_check = self.pagination_func(response_dict)
                 logging.debug("Next url: {}".format(next_url_check))
                 if next_url_check:
                     self.hopper.append(next_url_check)
 
-        return _response_list
+        self.result = response_list
+        return response_list
