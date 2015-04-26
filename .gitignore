@@ -1,2 +1,4 @@
 *.pyc
 apimanager/settings/config.json
+apimanager.egg-info/*
+apimanager-0.1.0-py2.7.egg
