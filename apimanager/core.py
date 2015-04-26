@@ -78,7 +78,12 @@ class RequestManager(object):
         return self
 
     def set_pagination(self, **kwargs):
-        '''Assign pagination variables to RequestManager object.'''
+        '''Assign pagination variables to RequestManager object.
+
+        Function takes the response object as first argument, with
+        other supporting paramaters passed and applied via partial.
+        '''
+
         self._pagination = {}
         self._pagination["func"] = kwargs["func"]
         self._pagination["params"] = kwargs["params"]
@@ -87,8 +92,6 @@ class RequestManager(object):
 
     def run(self):
         '''Make a series of requests from the hopper and handle pagination.'''
-        # @TODO:
-        # - Ability to return in different formats (raw, pandas, dict, etc)
 
         response_list = list()
         while self.hopper:
@@ -98,11 +101,8 @@ class RequestManager(object):
             request_made = request_made.replace(tzinfo=pytz.utc)
             logging.debug("Request sent timestamp: {}".format(request_made))
 
-            _current_request = self.hopper.pop()
-            response = requests.get(_current_request)
-
-            # json_response = json.loads(response.content)
-            # json_response["request_made"] = request_made
+            current_request = self.hopper.pop()
+            response = requests.get(current_request)
 
             result, output = utils.process_response(response,
                                                     request_made)
