@@ -2,8 +2,8 @@
 
 from .core import RequestManager
 import pandas as pd
-from . import utils
 from . import pagination
+from . import utils
 
 pagination_scheme = ('paging', 'next')
 
@@ -83,7 +83,7 @@ def feed(ids, access_token, date_end=None):
 
 
 def insights_fans(ids, access_token, date_start=None, date_end=None,
-                  period, freq=90):
+                  period="day", freq=90):
 
     api_endpoint = "/v2.2/{}/insights/page_fans"
     manager = _fb_in_batch_model(ids, access_token, api_endpoint,
