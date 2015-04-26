@@ -1,4 +1,5 @@
-import numpy as np
+# -*- coding: utf-8 -*-
+
 import json
 import logging
 import pandas as pd
