@@ -17,7 +17,7 @@ def create_manager():
 # Insights, single calls, streams, etc.
 
 
-def _fb_stream_model(ids, access_token, api_endpoint, date_start, date_end):
+def _fb_stream_model(ids, access_token, api_endpoint, date_start=None, date_end=None):
     api_domain = "https://graph.facebook.com"
     url_template = "{}{}".format(api_domain, api_endpoint)
 
