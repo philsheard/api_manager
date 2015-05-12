@@ -1,1 +1,6 @@
-{"facebook": {"access_token": "OAUTH ACCESS TOKEN GOES HERE"}}
+{
+    "facebook": 
+        {"access_token": "ADD_YOURS_HERE"},
+    "instagram":
+        {"client_id": "ADD_YOURS_HERE"}
+}

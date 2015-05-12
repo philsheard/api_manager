@@ -2,8 +2,8 @@
 
 from .core import RequestManager
 import pandas as pd
-from . import pagination
-from . import utils
+import pagination
+import utils
 
 pagination_scheme = ('paging', 'next')
 
@@ -17,7 +17,7 @@ def create_manager():
 # Insights, single calls, streams, etc.
 
 
-def _fb_stream_model(ids, access_token, api_endpoint, date_start=None, date_end=None):
+def _fb_stream_model(ids, access_token, api_endpoint, date_end=None):
     api_domain = "https://graph.facebook.com"
     url_template = "{}{}".format(api_domain, api_endpoint)
 
@@ -76,9 +76,19 @@ def _fb_in_batch_model(ids, access_token, api_endpoint,
 # Insights, single calls, streams, etc.
 
 
-def feed(ids, access_token, date_end=None):
+def feed(ids, access_token, date_end):
     api_endpoint = "/v2.2/{}/feed"
-    manager = _fb_stream_model(ids, access_token, api_endpoint, date_end)
+    manager = _fb_stream_model(ids=ids, access_token=access_token, 
+                               api_endpoint=api_endpoint, 
+                               date_end=date_end)
+    return manager
+
+
+def promotable_posts(ids, access_token, date_end):
+    api_endpoint = "/v2.2/{}/promotable_posts"
+    manager = _fb_stream_model(ids=ids, access_token=access_token, 
+                               api_endpoint=api_endpoint, 
+                               date_end=date_end)
     return manager
 
 
@@ -99,12 +109,6 @@ def insights_impressions_unique(ids, access_token, date_start,
     return manager
 
 
-def promotable_posts(ids, access_token, date_end=None,):
-    api_endpoint = "/v2.2/{}/promotable_posts"
-    manager = _fb_stream_model(ids, access_token, api_endpoint, date_end)
-    return manager
-
-
 def interactions(ids, access_token):
     api_endpoint = "/v2.2/{}/"
     api_domain = "https://graph.facebook.com"
@@ -118,8 +122,32 @@ def interactions(ids, access_token):
     return manager
 
 
+def insights_post_all(ids, access_token):
+    api_endpoint = "/v2.2/{}/insights"
+    api_domain = "https://graph.facebook.com"
+    url_template = "{}{}".format(api_domain, api_endpoint)
+    formatted_urls = (url_template.format(_id) for _id in ids)
+
+    params = {"access_token": access_token}
+
+    manager = RequestManager()
+    manager.from_product(formatted_urls, params)
+    return manager
+
 def insights_post_unique_impressions(ids, access_token):
     api_endpoint = "/v2.2/{}/insights/post_impressions_unique"
+    api_domain = "https://graph.facebook.com"
+    url_template = "{}{}".format(api_domain, api_endpoint)
+    formatted_urls = (url_template.format(_id) for _id in ids)
+
+    params = {"access_token": access_token}
+
+    manager = RequestManager()
+    manager.from_product(formatted_urls, params)
+    return manager
+
+def insights_post_unique_engaged_users(ids, access_token):
+    api_endpoint = "/v2.2/{}/insights/post_engaged_users"
     api_domain = "https://graph.facebook.com"
     url_template = "{}{}".format(api_domain, api_endpoint)
     formatted_urls = (url_template.format(_id) for _id in ids)

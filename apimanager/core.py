@@ -64,14 +64,25 @@ class RequestManager(object):
         :type param_groups: tuple[list[dict[str]]]
         :rtype: RequestManager instance with URLs added to hopper.
 
-        '''
-        _combined_params = product(*param_groups)
+        '''        
         list_of_params = []
-        for combined_param_product in _combined_params:
-            params = {}
-            for param_dict in combined_param_product:
-                params.update(param_dict)
-            list_of_params.append(urllib.urlencode(params))
+
+        # Check whether the function was passed multiple paramaters.
+        print len(param_groups[0])
+        if len(param_groups) > 1:
+            _combined_params = product(*param_groups)
+            list_of_params = []
+            for combined_param_product in _combined_params:
+                params = {}
+                for param_dict in combined_param_product:
+                    print param_dict
+                    params.update(param_dict)
+                list_of_params.append(urllib.urlencode(params))
+        # If not, just need to do a simple encode of the one dictionary.
+        else:
+            simple_params = param_groups[0]#[0]
+            list_of_params.append(urllib.urlencode(simple_params))
+        
         components = product(base_urls, list_of_params)
         finalised_urls = ["{0}?{1}".format(_u, _p) for _u, _p in components]
         self.hopper += finalised_urls
@@ -107,7 +118,12 @@ class RequestManager(object):
             result, output = utils.process_response(response,
                                                     request_made)
             if result == "OK":
-                response_list.extend(output)
+                if isinstance(output, list):
+                    response_list.extend(output)
+                elif isinstance(output, dict):
+                    response_list.append(output)
+                else:
+                    raise TypeError("Unknown response type.")
             elif result == "RETRY":
                 self.hopper.append(response.url)
 
