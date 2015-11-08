@@ -117,6 +117,7 @@ class RequestManager(object):
 
             result, output = utils.process_response(response,
                                                     request_made)
+            logging.debug(result)
             if result == "OK":
                 if isinstance(output, list):
                     response_list.extend(output)

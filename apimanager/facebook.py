@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import pdb
+
 from .core import RequestManager
 import pandas as pd
-import pagination
+# from . import utils
+# from . import pagination
 import utils
+import pagination
 
 pagination_scheme = ('paging', 'next')
 
@@ -45,9 +49,11 @@ def _fb_stream_model(ids, access_token, api_endpoint, date_end=None):
 
 
 def _fb_in_batch_model(ids, access_token, api_endpoint,
-                       date_start, date_end, period, freq):
-    if period not in {"day", "week", "days_28"}:
-        raise ValueError("Period must be 'day','week' or 'days_28'")
+                       date_range=None, freq=None, period="day"):
+    if period not in {"day", "week", "days_28", "lifetime"}:
+        raise ValueError("Period must be 'day','week', 'days_28' or 'lifetime'")
+
+    pdb.set_trace()
 
     api_domain = "https://graph.facebook.com"
     url_template = "{}{}".format(api_domain, api_endpoint)
@@ -59,14 +65,19 @@ def _fb_in_batch_model(ids, access_token, api_endpoint,
                     "period": period}, ]
 
     # Build date periods
-    _date_windows = utils.api_call_time_windows(date_start, date_end,
-                                                freq=freq)
-    _date_params = [{'since': x[0], 'until': x[1]} for x in _date_windows]
+    if date_range:
+        _date_windows = utils.api_call_time_windows(date_range=date_range, freq=freq)
+        _date_params = [{'since': x[0], 'until': x[1]} for x in _date_windows]
+    else:
+        _date_params = None
 
     # Create the RequestManager instance
     manager = RequestManager()
     # Now pass the paramaters and base URLs to fill the hopper.
-    manager.from_product(formatted_urls, base_params, _date_params)
+    if _date_params:
+        manager.from_product(formatted_urls, base_params, _date_params)
+    else:
+        manager.from_product(formatted_urls, base_params)
     # @TODO - add paging logic in here.
 
     return manager
@@ -75,8 +86,7 @@ def _fb_in_batch_model(ids, access_token, api_endpoint,
 # API specific methods - Make the common call types reusable.
 # Insights, single calls, streams, etc.
 
-
-def feed(ids, access_token, date_end):
+def feed(ids, access_token, date_end=None):
     api_endpoint = "/v2.2/{}/feed"
     manager = _fb_stream_model(ids=ids, access_token=access_token, 
                                api_endpoint=api_endpoint, 
@@ -91,13 +101,24 @@ def promotable_posts(ids, access_token, date_end):
                                date_end=date_end)
     return manager
 
+def insights_all(ids, access_token, date_range, period="day", freq=90):
+    # pdb.set_trace()
 
-def insights_fans(ids, access_token, date_start=None, date_end=None,
-                  period="day", freq=90):
+    api_endpoint = "/v2.2/{}/insights/"
+    manager = _fb_in_batch_model(ids=ids, access_token=access_token, api_endpoint=api_endpoint,
+                                 date_range=date_range, period=period, freq=freq)
+    return manager
 
+
+def insights_fans(ids, access_token, period="lifetime"):
     api_endpoint = "/v2.2/{}/insights/page_fans"
-    manager = _fb_in_batch_model(ids, access_token, api_endpoint,
-                                 date_start, date_end, period, freq)
+    manager = _fb_in_batch_model(ids=ids, access_token=access_token, api_endpoint=api_endpoint, period=period)
+    return manager
+
+def insights_page_fan_adds_unique(ids, access_token, date_range, period="day", freq=90):
+    api_endpoint = "/v2.2/{}/insights/page_fan_adds_unique"
+    manager = _fb_in_batch_model(ids=ids, access_token=access_token, api_endpoint=api_endpoint,
+                                 date_range=date_range, freq=freq, period=period)
     return manager
 
 

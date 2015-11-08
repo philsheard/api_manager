@@ -7,6 +7,8 @@ import datetime
 import pytz
 import time
 
+import pdb
+
 
 def error_checker(response):
     return_value = "ERROR"  # Default option
@@ -36,6 +38,7 @@ def error_checker(response):
 
 
 def process_response(response, request_made):
+    # pdb.set_trace()
     response_check = error_checker(response)
     response_dict = json.loads(response.content)
     if response_check == "VALID_FB_FEED":
@@ -68,27 +71,36 @@ def process_response(response, request_made):
     return (result, output)
 
 
-def api_call_time_windows(start=None, end=None, freq=90,
-                          output_format="unix_ts"):
+def api_call_time_windows(date_range, freq=90, output_format="unix_ts"):
     # # @TODO - this method needs to be timezone-aware in future.
+    
+    # pdb.set_trace()
+    
     _utcnow = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
-    if start is None:
-        start = _utcnow
-    if end is None:
-        end = _utcnow - datetime.datetime.timedelta(days=7)
 
-    _earliest_date = pd.to_datetime(start)
-    _latest_date = pd.to_datetime(end)
-    range_with_intervals = pd.date_range(start=_earliest_date,
-                                         end=_latest_date,
-                                         freq=(freq * pd.datetools.day))
+    # if start is None:
+    #     start = _utcnow
+    # if end is None:
+    #     end = _utcnow - datetime.timedelta(days=7)
+
+    time_range = pd.TimeSeries(pd.to_datetime(date_range))
+    time_range.sort()
+    range_with_intervals = pd.date_range(time_range.min(), time_range.max(), freq=(freq * pd.datetools.day))
+
+    # _earliest_date = pd.to_datetime(start)
+    # _latest_date = pd.to_datetime(end)
+    # range_with_intervals = pd.date_range(start=_latest_date,
+    #                                      end=_earliest_date,
+    #                                      freq=(freq * pd.datetools.day))
     converted_to_list = range_with_intervals.to_pydatetime().tolist()
+
+### DEBUGGING - this date range is broken.
 
     # Check whether the last date is included.
     # Function uses Pandas for the date range, and its behaviour is to exclude
     # the last date if the frequency provided is greater than the time window.
-    if converted_to_list[-1] < _latest_date:
-        converted_to_list.append(_latest_date.to_pydatetime())
+    if converted_to_list[-1] < time_range.max():
+        converted_to_list.append(time_range.max().to_pydatetime())
     # Convert the timestamps into relevant format
     if output_format is "unix_ts":  # Unix timestamp = seconds since the epoch.
         final_date_ranges = pd.Series(converted_to_list).astype(int) // 10**9
